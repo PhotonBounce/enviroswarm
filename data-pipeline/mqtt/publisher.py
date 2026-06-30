@@ -3,7 +3,6 @@
 import json
 import time
 import random
-from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 try:
@@ -52,10 +51,27 @@ def publish_readings(
         return 0
     
     client.loop_start()
-    time.sleep(0.3)  # brief window for connection
+    
+    # Poll until connected instead of a fixed sleep
+    connected = False
+    for _ in range(50):  # 5 seconds max
+        if client.is_connected():
+            connected = True
+            break
+        time.sleep(0.1)
+    
+    if not connected:
+        print("[MQTT] Connection timed out.")
+        client.loop_stop()
+        client.disconnect()
+        return 0
     
     published = 0
     for r in readings:
+        if not client.is_connected():
+            print("[MQTT] Connection lost during publish loop.")
+            break
+        
         station_id = r.get("station_id", "unknown")
         sensor_type = r.get("sensor_type", "unknown")
         topic = f"{topic_prefix}/{station_id}/{sensor_type}"
@@ -69,8 +85,12 @@ def publish_readings(
         })
         
         try:
-            client.publish(topic, payload, qos=1)
-            published += 1
+            info = client.publish(topic, payload, qos=1)
+            info.wait_for_publish(timeout=5)
+            if info.is_published():
+                published += 1
+            else:
+                print(f"[MQTT] Publish not confirmed for {topic}")
         except Exception as e:
             print(f"[MQTT] Publish error: {e}")
         

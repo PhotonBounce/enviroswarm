@@ -5,12 +5,10 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
-import numpy as np
-
 
 def _daily_seasonal_factor(hour: int, base_phase: float = 0.0) -> float:
     """Return a diurnal factor (-1 to 1) based on hour of day."""
-    # Simple sinusoidal: coldest ~6am, warmest ~3pm (15h)
+    # Simple sinusoidal: coldest ~6am, warmest ~noon (12h)
     phase = (hour - 6) / 24 * 2 * math.pi + base_phase
     return math.sin(phase)
 
@@ -32,7 +30,7 @@ def _temperature_value(
     base = base_temp if base_temp is not None else city_bases.get(city, 15.0)
     
     hour = timestamp.hour
-    day_of_year = timestamp.timetuple().tm_yday
+    day_of_year = timestamp.utctimetuple().tm_yday
     
     # Seasonal variation (coldest in Jan, warmest in July)
     seasonal = -15 * math.cos((day_of_year - 15) / 365 * 2 * math.pi)
@@ -169,49 +167,58 @@ def generate_readings_for_station(
     
     readings = []
     current = start_time
-    
-    # Precompute temperature for each timestep so humidity can correlate
-    # This is a bit memory-heavy but keeps logic clean
+
+    # Precompute intervals
     intervals = []
     while current <= end_time:
         intervals.append(current)
         current += timedelta(minutes=interval_minutes)
-    
+
+    # Additive outlier offsets per sensor type (kept visible, not clamped away)
+    OUTLIER_OFFSETS = {
+        "temperature": [30, -30, 50],
+        "humidity": [40, -40, 60],
+        "co2": [500, -500, 1000],
+        "pm25": [200, -200, 400],
+        "pm10": [300, -300, 600],
+        "noise_level": [50, -50, 80],
+        "radiation": [1.0, -1.0, 2.0],
+        "air_quality": [300, -300, 500],
+        "water_quality": [50, -50, 80],
+        "voc": [1000, -1000, 2000],
+    }
+
     # Generate per-interval, per-sensor
     for ts in intervals:
         # Simulate missing interval (whole timestamp dropped for all sensors)
         if random.random() < missing_rate:
             continue
-        
-        # Temperature first for correlation
-        temp = None
-        pm25 = None
-        pm10 = None
-        
+
+        # Pre-compute correlated base values for this timestep so every
+        # sensor sees the same temperature / particulate matter.
+        temp = _temperature_value(ts, city)
+        pm25 = _pm25_value(city)
+        pm10 = _pm10_value(pm25)
+
         for st in sensor_types:
             value = None
             unit = ""
-            
+
             if st == "temperature":
-                value = _temperature_value(ts, city)
+                value = temp
                 unit = "°C"
-                temp = value
             elif st == "humidity":
-                value = _humidity_value(ts, temp if temp is not None else 15.0)
+                value = _humidity_value(ts, temp)
                 unit = "%"
             elif st == "co2":
                 value = _co2_value(city)
                 unit = "ppm"
             elif st == "pm25":
-                value = _pm25_value(city)
+                value = pm25
                 unit = "µg/m³"
-                pm25 = value
             elif st == "pm10":
-                if pm25 is None:
-                    pm25 = _pm25_value(city)
-                value = _pm10_value(pm25)
+                value = pm10
                 unit = "µg/m³"
-                pm10 = value
             elif st == "noise_level":
                 value = _noise_level_value(city, ts.hour)
                 unit = "dB"
@@ -219,10 +226,6 @@ def generate_readings_for_station(
                 value = _radiation_value()
                 unit = "µSv/h"
             elif st == "air_quality":
-                if pm25 is None:
-                    pm25 = _pm25_value(city)
-                if pm10 is None:
-                    pm10 = _pm10_value(pm25)
                 value = _air_quality_value(pm25, pm10)
                 unit = "AQI"
             elif st == "water_quality":
@@ -234,44 +237,35 @@ def generate_readings_for_station(
             else:
                 value = random.uniform(0, 100)
                 unit = "unit"
-            
-            # Inject outlier
+
+            metadata = {
+                "city": city,
+                "station_name": station.get("name", ""),
+                "simulated": True,
+            }
+
+            # Inject outlier using additive offsets so bounded sensors still show extremes
             if random.random() < outlier_rate:
-                outlier_multiplier = random.choice([5.0, -4.0, 10.0])
-                value = value * outlier_multiplier
-                # Clamp to reasonable bounds after outlier
-                if st == "temperature":
-                    value = max(-50.0, min(60.0, value))
-                elif st == "humidity":
-                    value = max(0.0, min(100.0, value))
-                elif st == "co2":
-                    value = max(300.0, min(2000.0, value))
-                elif st in ("pm25", "pm10"):
-                    value = max(0.0, min(500.0, value))
-                elif st == "noise_level":
-                    value = max(20.0, min(140.0, value))
-                elif st == "radiation":
-                    value = max(0.0, min(2.0, value))
-                elif st == "air_quality":
-                    value = max(0.0, min(500.0, value))
-                elif st == "water_quality":
-                    value = max(0.0, min(100.0, value))
-                elif st == "voc":
-                    value = max(0.0, min(5000.0, value))
-            
+                offset = random.choice(OUTLIER_OFFSETS.get(st, [50, -40, 100]))
+                value += offset
+                metadata["outlier"] = True
+                # Only clamp negative values for physically non-negative quantities;
+                # allow upper extremes to remain visible.
+                if st in ("humidity", "co2", "pm25", "pm10", "noise_level",
+                          "radiation", "air_quality", "water_quality", "voc"):
+                    value = max(0.0, value)
+                elif st == "temperature":
+                    value = max(-80.0, value)
+
             readings.append({
                 "station_id": station_id,
                 "sensor_type": st,
                 "value": round(value, 4) if isinstance(value, float) else float(value),
                 "unit": unit,
                 "timestamp": ts.isoformat(),
-                "metadata": {
-                    "city": city,
-                    "station_name": station.get("name", ""),
-                    "simulated": True,
-                },
+                "metadata": metadata,
             })
-    
+
     return readings
 
 
