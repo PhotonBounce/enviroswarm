@@ -2,6 +2,7 @@
 
 import re
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
