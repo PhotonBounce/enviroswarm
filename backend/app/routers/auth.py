@@ -105,9 +105,15 @@ async def refresh_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token"
+        )
     result = await db.execute(
         select(User).where(
-            User.id == user_id,
+            User.id == user_uuid,
             User.is_active == True,
             User.deleted_at.is_(None),
         )

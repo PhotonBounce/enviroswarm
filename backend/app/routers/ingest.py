@@ -49,7 +49,7 @@ async def ingest(
 
     try:
         # Verify all stations belong to user and are not soft-deleted
-        station_ids = {str(r.station_id) for r in body.readings}
+        station_ids = {r.station_id for r in body.readings}
         result = await db.execute(
             select(SensorStation).where(
                 SensorStation.id.in_(station_ids),
@@ -58,7 +58,7 @@ async def ingest(
             )
         )
         stations = result.scalars().all()
-        station_sensor_types = {str(s.id): s.sensor_types for s in stations}
+        station_sensor_types = {s.id: s.sensor_types for s in stations}
         owned = set(station_sensor_types.keys())
         missing = station_ids - owned
         if missing:
@@ -75,7 +75,7 @@ async def ingest(
         future_limit = now + timedelta(minutes=5)
 
         for r in body.readings:
-            if r.sensor_type not in station_sensor_types.get(str(r.station_id), []):
+            if r.sensor_type not in station_sensor_types.get(r.station_id, []):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Sensor type '{r.sensor_type}' not configured for station {r.station_id}",

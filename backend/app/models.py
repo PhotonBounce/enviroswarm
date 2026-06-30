@@ -71,7 +71,7 @@ class SensorStation(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     latitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 8), nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(Numeric(11, 8), nullable=True)
-    sensor_types: Mapped[List[str]] = mapped_column(ARRAY(Text), nullable=False)
+    sensor_types: Mapped[List[str]] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

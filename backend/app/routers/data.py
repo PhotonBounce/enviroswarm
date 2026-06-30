@@ -171,7 +171,8 @@ async def nearby(
         )
     )
     if sensor_type:
-        stmt = stmt.where(SensorStation.sensor_types.any(sensor_type))
+        # JSON contains check removed; Python-side filter below handles this.
+        pass
 
     result = await db.execute(stmt)
     stations = result.scalars().all()
