@@ -24,6 +24,11 @@ export default function Register() {
     }
     try {
       const result = await registerMutation.mutateAsync({ email, password })
+      // Store token BEFORE any authenticated API calls
+      localStorage.setItem('access_token', result.access_token)
+      if (result.refresh_token) {
+        localStorage.setItem('refresh_token', result.refresh_token)
+      }
       try {
         const userData = await api.get('/me')
         if (userData.data?.success) {
