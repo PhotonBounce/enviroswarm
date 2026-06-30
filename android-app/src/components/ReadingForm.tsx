@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,12 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
   const [lat, setLat] = useState(initialLat?.toString() || '');
   const [lon, setLon] = useState(initialLon?.toString() || '');
 
+  // Sync lat/lon when parent re-renders with new coordinates
+  useEffect(() => {
+    if (initialLat !== undefined) setLat(String(initialLat));
+    if (initialLon !== undefined) setLon(String(initialLon));
+  }, [initialLat, initialLon]);
+
   const handleSubmit = () => {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return;
@@ -40,14 +46,14 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
       sensor_type: sensorType,
       value: numValue,
       unit: SENSOR_UNITS[sensorType],
-      lat: lat ? parseFloat(lat) : undefined,
-      lon: lon ? parseFloat(lon) : undefined,
+      lat: lat !== '' ? parseFloat(lat) : undefined,
+      lon: lon !== '' ? parseFloat(lon) : undefined,
     });
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.container}
     >
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -60,7 +66,7 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
               onPress={() => setSensorType(t)}
             >
               <Text style={[styles.typeChipText, sensorType === t && styles.typeChipTextActive]}>
-                {t.replace('_', ' ')}
+                {t.replace(/_/g, ' ')}
               </Text>
             </TouchableOpacity>
           ))}

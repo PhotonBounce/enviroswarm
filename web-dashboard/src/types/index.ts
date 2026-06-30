@@ -41,7 +41,7 @@ export interface SensorReading {
   value: number
   unit: string
   timestamp: string
-  metadata: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }
 
 export interface ApiKey {

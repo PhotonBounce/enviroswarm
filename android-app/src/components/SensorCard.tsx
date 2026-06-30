@@ -8,13 +8,15 @@ interface SensorCardProps {
 
 export function SensorCard({ reading }: SensorCardProps) {
   const unit = SENSOR_UNITS[reading.sensor_type] || reading.unit;
+  const date = new Date(reading.timestamp);
+  const timestampStr = isNaN(date.getTime()) ? '—' : date.toLocaleString();
   return (
     <View style={styles.card}>
-      <Text style={styles.type}>{reading.sensor_type.replace('_', ' ').toUpperCase()}</Text>
+      <Text style={styles.type}>{reading.sensor_type.replace(/_/g, ' ').toUpperCase()}</Text>
       <Text style={styles.value}>
         {reading.value.toFixed(2)} {unit}
       </Text>
-      <Text style={styles.timestamp}>{new Date(reading.timestamp).toLocaleString()}</Text>
+      <Text style={styles.timestamp}>{timestampStr}</Text>
     </View>
   );
 }

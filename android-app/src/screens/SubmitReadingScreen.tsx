@@ -22,13 +22,16 @@ export default function SubmitReadingScreen() {
   const { latitude, longitude, getCurrentLocation } = useLocation();
 
   const fetchStations = async () => {
+    setRefreshing(true);
     try {
       const res = await apiClient.get<ApiResponse<SensorStation[]>>('/stations');
-      if (res.data.success) {
+      if (res.data?.success) {
         setStations(res.data.data || []);
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to load stations');
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -51,16 +54,16 @@ export default function SubmitReadingScreen() {
       const payload = {
         ...data,
         metadata: {
-          ...(data.lat ? { lat: data.lat } : {}),
-          ...(data.lon ? { lon: data.lon } : {}),
+          ...(data.lat !== undefined && data.lat !== null ? { lat: data.lat } : {}),
+          ...(data.lon !== undefined && data.lon !== null ? { lon: data.lon } : {}),
         },
       };
       const res = await apiClient.post<ApiResponse<SensorReading>>('/ingest', payload);
-      if (res.data.success) {
+      if (res.data?.success) {
         Alert.alert('Success', 'Reading submitted successfully');
         setSelectedStation(null);
       } else {
-        Alert.alert('Error', res.data.error || 'Submission failed');
+        Alert.alert('Error', res.data?.error || 'Submission failed');
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Submission failed');
@@ -103,8 +106,8 @@ export default function SubmitReadingScreen() {
       <Text style={styles.subtitle}>{selectedStation.name}</Text>
       <ReadingForm
         stationId={selectedStation.id}
-        initialLat={latitude || undefined}
-        initialLon={longitude || undefined}
+        initialLat={latitude ?? undefined}
+        initialLon={longitude ?? undefined}
         onSubmit={handleSubmit}
         loading={loading}
       />

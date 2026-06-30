@@ -33,13 +33,14 @@ export default function StationsScreen({ navigation }: Props) {
   const [selectedTypes, setSelectedTypes] = useState<SensorType[]>(['temperature']);
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
-  const { latitude, longitude, getCurrentLocation } = useLocation();
+  const [isCreating, setIsCreating] = useState(false);
+  const { getCurrentLocation } = useLocation();
 
   const fetchStations = async () => {
     setLoading(true);
     try {
       const res = await apiClient.get<ApiResponse<SensorStation[]>>('/stations');
-      if (res.data.success) {
+      if (res.data?.success) {
         setStations(res.data.data || []);
       }
     } catch (err: any) {
@@ -56,11 +57,11 @@ export default function StationsScreen({ navigation }: Props) {
   );
 
   const openCreateModal = async () => {
-    await getCurrentLocation();
+    const loc = await getCurrentLocation();
     setName('');
     setSelectedTypes(['temperature']);
-    setLat(latitude ? String(latitude) : '');
-    setLon(longitude ? String(longitude) : '');
+    setLat(loc?.latitude !== null && loc?.latitude !== undefined ? String(loc.latitude) : '');
+    setLon(loc?.longitude !== null && loc?.longitude !== undefined ? String(loc.longitude) : '');
     setModalVisible(true);
   };
 
@@ -75,21 +76,34 @@ export default function StationsScreen({ navigation }: Props) {
       Alert.alert('Validation', 'Name and at least one sensor type required');
       return;
     }
+    const latVal = lat ? parseFloat(lat) : undefined;
+    const lonVal = lon ? parseFloat(lon) : undefined;
+    if (lat !== '' && isNaN(latVal ?? NaN)) {
+      Alert.alert('Validation', 'Latitude must be a valid number');
+      return;
+    }
+    if (lon !== '' && isNaN(lonVal ?? NaN)) {
+      Alert.alert('Validation', 'Longitude must be a valid number');
+      return;
+    }
+    setIsCreating(true);
     try {
       const res = await apiClient.post<ApiResponse<SensorStation>>('/stations', {
         name,
         sensor_types: selectedTypes,
-        latitude: lat ? parseFloat(lat) : undefined,
-        longitude: lon ? parseFloat(lon) : undefined,
+        latitude: latVal,
+        longitude: lonVal,
       });
-      if (res.data.success) {
+      if (res.data?.success) {
         setModalVisible(false);
         fetchStations();
       } else {
-        Alert.alert('Error', res.data.error || 'Failed to create station');
+        Alert.alert('Error', res.data?.error || 'Failed to create station');
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to create station');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -130,7 +144,7 @@ export default function StationsScreen({ navigation }: Props) {
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={styles.modalContent}
           >
             <ScrollView>
@@ -154,7 +168,7 @@ export default function StationsScreen({ navigation }: Props) {
                     onPress={() => toggleType(t)}
                   >
                     <Text style={[styles.chipText, selectedTypes.includes(t) && styles.chipTextActive]}>
-                      {t.replace('_', ' ')}
+                      {t.replace(/_/g, ' ')}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -184,8 +198,8 @@ export default function StationsScreen({ navigation }: Props) {
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={createStation}>
-                  <Text style={styles.saveBtnText}>Create</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={createStation} disabled={isCreating}>
+                  <Text style={styles.saveBtnText}>{isCreating ? 'Creating...' : 'Create'}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>

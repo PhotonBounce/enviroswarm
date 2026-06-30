@@ -41,6 +41,7 @@ export interface User {
   email: string;
   tier: 'free' | 'pro' | 'enterprise';
   created_at: string;
+  updated_at: string;
 }
 
 export interface SensorStation {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,36 +9,61 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
 import { apiClient } from '../api/client';
 import { SensorReading, ApiResponse, SensorType, SENSOR_UNITS } from '../types';
 import { SensorCard } from '../components/SensorCard';
 import { RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type RootStackParamList = {
+  DataView: { stationId: string; stationName: string };
+};
 
 interface Props {
-  route: RouteProp<any>;
+  route: RouteProp<RootStackParamList, 'DataView'>;
+  navigation: NativeStackNavigationProp<RootStackParamList, 'DataView'>;
 }
 
 const screenWidth = Dimensions.get('window').width - 32;
 
 export default function DataViewScreen({ route }: Props) {
-  const { stationId, stationName } = route.params as { stationId: string; stationName: string };
+  const params = route.params;
+  if (!params?.stationId || !params?.stationName) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Text style={styles.errorText}>Invalid navigation parameters</Text>
+      </SafeAreaView>
+    );
+  }
+  const { stationId, stationName } = params;
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
   const [sensorType, setSensorType] = useState<SensorType | 'all'>('all');
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const url = `/data?station_id=${stationId}&limit=100${sensorType !== 'all' ? `&sensor_type=${sensorType}` : ''}`;
-      const res = await apiClient.get<ApiResponse<SensorReading[]>>(url);
-      if (res.data.success) {
-        setReadings(res.data.data || []);
+      const searchParams = new URLSearchParams({ station_id: stationId, limit: '100' });
+      if (sensorType !== 'all') {
+        searchParams.append('sensor_type', sensorType);
+      }
+      const res = await apiClient.get<ApiResponse<SensorReading[]>>(`/data?${searchParams.toString()}`);
+      if (res.data?.success) {
+        if (isMounted.current) setReadings(res.data.data || []);
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load data');
+      if (isMounted.current) Alert.alert('Error', err?.message || 'Failed to load data');
     } finally {
-      setLoading(false);
+      if (isMounted.current) setLoading(false);
     }
   };
 
@@ -46,29 +71,35 @@ export default function DataViewScreen({ route }: Props) {
     fetchData();
   }, [stationId, sensorType]);
 
-  const groupedByType: Record<string, SensorReading[]> = {};
-  for (const r of readings) {
-    if (!groupedByType[r.sensor_type]) groupedByType[r.sensor_type] = [];
-    groupedByType[r.sensor_type].push(r);
-  }
+  const groupedByType = useMemo(() => {
+    const groups: Record<string, SensorReading[]> = {};
+    for (const r of readings) {
+      if (!groups[r.sensor_type]) groups[r.sensor_type] = [];
+      groups[r.sensor_type].push(r);
+    }
+    return groups;
+  }, [readings]);
 
-  const chartData = (type: SensorType) => {
-    const items = groupedByType[type]?.slice(-20) || [];
-    if (items.length < 2) return null;
-    return {
-      labels: items.map((_, i) => String(i + 1)),
-      datasets: [
-        {
-          data: items.map((r) => r.value),
-          color: () => '#10b981',
-          strokeWidth: 2,
-        },
-      ],
-      legend: [type.replace('_', ' ')],
+  const chartData = useMemo(() => {
+    const fn = (type: SensorType) => {
+      const items = groupedByType[type]?.slice(-20) || [];
+      if (items.length < 2) return null;
+      return {
+        labels: items.map((_, i) => String(i + 1)),
+        datasets: [
+          {
+            data: items.map((r) => r.value),
+            color: () => '#10b981',
+            strokeWidth: 2,
+          },
+        ],
+        legend: [type.replace(/_/g, ' ')],
+      };
     };
-  };
+    return fn;
+  }, [groupedByType]);
 
-  const chartConfig = {
+  const chartConfig = useMemo(() => ({
     backgroundColor: '#1e293b',
     backgroundGradientFrom: '#1e293b',
     backgroundGradientTo: '#1e293b',
@@ -83,46 +114,48 @@ export default function DataViewScreen({ route }: Props) {
       strokeWidth: '2',
       stroke: '#10b981',
     },
-  };
+  }), []);
 
   const types = Object.keys(groupedByType) as SensorType[];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.title}>{stationName}</Text>
-      <Text style={styles.subtitle}>Data View</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <Text style={styles.title}>{stationName}</Text>
+        <Text style={styles.subtitle}>Data View</Text>
 
-      {loading && <ActivityIndicator size="large" color="#10b981" style={{ marginVertical: 20 }} />}
+        {loading && <ActivityIndicator size="large" color="#10b981" style={{ marginVertical: 20 }} />}
 
-      {!loading && readings.length === 0 && (
-        <Text style={styles.emptyText}>No readings yet for this station.</Text>
-      )}
+        {!loading && readings.length === 0 && (
+          <Text style={styles.emptyText}>No readings yet for this station.</Text>
+        )}
 
-      {types.map((type) => {
-        const data = chartData(type);
-        if (!data) return null;
-        return (
-          <View key={type} style={styles.chartWrapper}>
-            <Text style={styles.chartTitle}>
-              {type.replace('_', ' ').toUpperCase()} ({SENSOR_UNITS[type]})
-            </Text>
-            <LineChart
-              data={data}
-              width={screenWidth}
-              height={220}
-              chartConfig={chartConfig}
-              bezier
-              style={styles.chart}
-            />
-          </View>
-        );
-      })}
+        {types.map((type) => {
+          const data = chartData(type);
+          if (!data) return null;
+          return (
+            <View key={type} style={styles.chartWrapper}>
+              <Text style={styles.chartTitle}>
+                {type.replace(/_/g, ' ').toUpperCase()} ({SENSOR_UNITS[type]})
+              </Text>
+              <LineChart
+                data={data}
+                width={screenWidth}
+                height={220}
+                chartConfig={chartConfig}
+                bezier
+                style={styles.chart}
+              />
+            </View>
+          );
+        })}
 
-      <Text style={styles.sectionTitle}>Recent Readings</Text>
-      {readings.slice(0, 20).map((r) => (
-        <SensorCard key={r.id} reading={r} />
-      ))}
-    </ScrollView>
+        <Text style={styles.sectionTitle}>Recent Readings</Text>
+        {readings.slice(0, 20).map((r) => (
+          <SensorCard key={r.id} reading={r} />
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -130,6 +163,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 40,
   },
   title: {
     color: '#10b981',

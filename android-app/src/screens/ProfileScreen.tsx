@@ -5,7 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../context/AuthContext';
 
 export default function ProfileScreen() {
@@ -19,30 +21,43 @@ export default function ProfileScreen() {
 
   const tierInfo = user ? tiers[user.tier] || tiers.free : tiers.free;
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Log Out', style: 'destructive', onPress: logout },
+      ]
+    );
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
-      <Text style={styles.title}>Profile</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView contentContainerStyle={{ padding: 16 }}>
+        <Text style={styles.title}>Profile</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.value}>{user?.email || '—'}</Text>
+        <View style={styles.card}>
+          <Text style={styles.label}>Email</Text>
+          <Text style={styles.value}>{user?.email || '—'}</Text>
 
-        <Text style={styles.label}>Tier</Text>
-        <Text style={styles.value}>{tierInfo.label}</Text>
+          <Text style={styles.label}>Tier</Text>
+          <Text style={styles.value}>{tierInfo.label}</Text>
 
-        <Text style={styles.label}>Limits</Text>
-        <Text style={styles.value}>{tierInfo.limit}</Text>
+          <Text style={styles.label}>Limits</Text>
+          <Text style={styles.value}>{tierInfo.limit}</Text>
 
-        <Text style={styles.label}>Member Since</Text>
-        <Text style={styles.value}>
-          {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
-        </Text>
-      </View>
+          <Text style={styles.label}>Member Since</Text>
+          <Text style={styles.value}>
+            {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+          </Text>
+        </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutBtnText}>Log Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Text style={styles.logoutBtnText}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

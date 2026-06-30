@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Region } from 'react-native-maps';
 import { useLocation } from '../hooks/useLocation';
 import { apiClient } from '../api/client';
@@ -35,10 +36,11 @@ export default function HomeScreen({ navigation }: Props) {
   const fetchNearby = async (lat: number, lon: number) => {
     setLoading(true);
     try {
+      const params = new URLSearchParams({ lat: String(lat), lon: String(lon), radius_km: '10' });
       const res = await apiClient.get<ApiResponse<SensorStation[]>>(
-        `/data/nearby?lat=${lat}&lon=${lon}&radius_km=10`
+        `/data/nearby?${params.toString()}`
       );
-      if (res.data.success) {
+      if (res.data?.success) {
         setStations(res.data.data || []);
       }
     } catch (err: any) {
@@ -49,7 +51,7 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   useEffect(() => {
-    if (latitude && longitude) {
+    if (latitude !== null && longitude !== null) {
       setRegion({
         latitude,
         longitude,
@@ -66,26 +68,26 @@ export default function HomeScreen({ navigation }: Props) {
 
   if (locLoading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <ActivityIndicator size="large" color="#10b981" />
         <Text style={styles.statusText}>Getting location...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (locError) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center} edges={['top']}>
         <Text style={styles.errorText}>{locError}</Text>
         <TouchableOpacity style={styles.refreshBtn} onPress={handleRefresh}>
           <Text style={styles.refreshBtnText}>Retry</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <MapView
         style={{ width, height }}
         region={region}
@@ -110,7 +112,7 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.refreshBtnText}>Refresh</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
