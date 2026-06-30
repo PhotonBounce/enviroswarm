@@ -49,9 +49,11 @@ async def create_api_key(
 
     raw_key = _generate_api_key()
     key_hash = _hash_key(raw_key)
+    key_prefix = raw_key[:8].lower()
 
     api_key = ApiKey(
         user_id=user.id,
+        key_prefix=key_prefix,
         key_hash=key_hash,
         name=body.name,
         permissions=body.permissions or {"read": True, "write": False},

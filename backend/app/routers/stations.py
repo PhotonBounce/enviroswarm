@@ -1,8 +1,9 @@
 """Sensor stations router."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from app.auth import get_current_user
 from app.database import get_db
@@ -20,11 +21,13 @@ async def create_station(
 ) -> StandardResponse:
     # Tier limits
     result = await db.execute(
-        select(SensorStation).where(SensorStation.user_id == user.id)
+        select(func.count(SensorStation.id)).where(
+            SensorStation.user_id == user.id, SensorStation.deleted_at.is_(None)
+        )
     )
-    existing = result.scalars().all()
+    existing_count = result.scalar_one() or 0
     tier_limits = {"free": 1, "pro": 10, "enterprise": 9999}
-    if len(existing) >= tier_limits.get(user.tier, 1):
+    if existing_count >= tier_limits.get(user.tier, 1):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Station limit reached for your tier",
@@ -50,13 +53,26 @@ async def create_station(
 async def list_stations(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    status_filter: Optional[str] = Query(None, alias="status"),
 ) -> StandardResponse:
-    result = await db.execute(
-        select(SensorStation).where(SensorStation.user_id == user.id)
+    stmt = select(SensorStation).where(
+        SensorStation.user_id == user.id, SensorStation.deleted_at.is_(None)
     )
+    if status_filter:
+        stmt = stmt.where(SensorStation.status == status_filter)
+
+    count_stmt = stmt.with_only_columns(func.count(SensorStation.id), maintain_order_from=False)
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar_one() or 0
+
+    stmt = stmt.order_by(SensorStation.created_at.desc()).offset(offset).limit(limit)
+    result = await db.execute(stmt)
     stations = result.scalars().all()
     return StandardResponse(
-        data=[StationResponse.model_validate(s).model_dump(mode="json") for s in stations]
+        data=[StationResponse.model_validate(s).model_dump(mode="json") for s in stations],
+        meta={"page": (offset // limit) + 1, "limit": limit, "total": total},
     )
 
 
@@ -68,7 +84,9 @@ async def get_station(
 ) -> StandardResponse:
     result = await db.execute(
         select(SensorStation).where(
-            SensorStation.id == station_id, SensorStation.user_id == user.id
+            SensorStation.id == station_id,
+            SensorStation.user_id == user.id,
+            SensorStation.deleted_at.is_(None),
         )
     )
     station = result.scalar_one_or_none()
@@ -79,3 +97,59 @@ async def get_station(
     return StandardResponse(
         data=StationResponse.model_validate(station).model_dump(mode="json")
     )
+
+
+@router.patch("/{station_id}", response_model=StandardResponse)
+async def update_station(
+    station_id: str,
+    body: StationCreateRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StandardResponse:
+    result = await db.execute(
+        select(SensorStation).where(
+            SensorStation.id == station_id,
+            SensorStation.user_id == user.id,
+            SensorStation.deleted_at.is_(None),
+        )
+    )
+    station = result.scalar_one_or_none()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
+        )
+
+    station.name = body.name
+    station.latitude = body.latitude
+    station.longitude = body.longitude
+    station.sensor_types = body.sensor_types
+    station.status = body.status
+    await db.commit()
+    await db.refresh(station)
+    return StandardResponse(
+        data=StationResponse.model_validate(station).model_dump(mode="json")
+    )
+
+
+@router.delete("/{station_id}", response_model=StandardResponse)
+async def delete_station(
+    station_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> StandardResponse:
+    result = await db.execute(
+        select(SensorStation).where(
+            SensorStation.id == station_id,
+            SensorStation.user_id == user.id,
+            SensorStation.deleted_at.is_(None),
+        )
+    )
+    station = result.scalar_one_or_none()
+    if not station:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
+        )
+    from datetime import datetime, timezone
+    station.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    return StandardResponse(data={"deleted": str(station_id)})

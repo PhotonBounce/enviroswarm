@@ -1,5 +1,6 @@
 """JWT utilities, password hashing, and current-user dependency."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -20,11 +21,27 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 # ---------------------------------------------------------------------------
+# Password validation
+# ---------------------------------------------------------------------------
+
+def validate_password(password: str) -> None:
+    """Raise ValueError if password does not meet complexity requirements."""
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        raise ValueError("Password must contain at least one lowercase letter")
+    if not re.search(r"[0-9]", password):
+        raise ValueError("Password must contain at least one digit")
+
+
+# ---------------------------------------------------------------------------
 # Password hashing
 # ---------------------------------------------------------------------------
 
 def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
+    salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
     return hashed.decode("utf-8")
 
@@ -48,15 +65,28 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
         "iat": now,
         "exp": now + expires_delta,
         "type": "access",
+        "jti": bcrypt.gensalt(rounds=5).decode("utf-8"),  # unique token ID for revocation
     }
     token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     return token
 
 
-def decode_access_token(token: str) -> dict:
+def create_refresh_token(user_id: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "iat": now,
+        "exp": now + timedelta(days=settings.refresh_token_expire_days),
+        "type": "refresh",
+        "jti": bcrypt.gensalt(rounds=5).decode("utf-8"),
+    }
+    token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+    return token
+
+
+def decode_token(token: str, expected_type: str) -> dict:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired"
@@ -65,6 +95,21 @@ def decode_access_token(token: str) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
+
+    if payload.get("type") != expected_type:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Expected {expected_type} token",
+        )
+    return payload
+
+
+def decode_access_token(token: str) -> dict:
+    return decode_token(token, "access")
+
+
+def decode_refresh_token(token: str) -> dict:
+    return decode_token(token, "refresh")
 
 
 # ---------------------------------------------------------------------------
@@ -81,10 +126,20 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
         )
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive"
         )
     return user
+
+
+async def get_current_user_optional(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Return user or None if auth fails. Useful for public endpoints with optional auth."""
+    try:
+        return await get_current_user(token, db)
+    except HTTPException:
+        return None

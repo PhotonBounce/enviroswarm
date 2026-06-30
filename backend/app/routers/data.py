@@ -6,7 +6,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -29,42 +29,97 @@ async def query_data(
     sensor_type: Optional[str] = Query(None),
     start: Optional[datetime] = Query(None),
     end: Optional[datetime] = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(100, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
     aggregate: Optional[str] = Query(None, pattern="^(none|hour|day|month)$"),
     user: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    # Build query
-    stmt = select(SensorReading).join(SensorStation).where(
-        SensorStation.user_id == user.id
+    # Retention check based on tier
+    retention_days = {"free": 7, "pro": 90, "enterprise": 730}
+    max_retention = retention_days.get(user.tier, 7)
+    earliest_allowed = datetime.now(timezone.utc) - timedelta(days=max_retention)
+    effective_start = max(start, earliest_allowed) if start else earliest_allowed
+
+    if aggregate and aggregate != "none":
+        # Aggregation query using date_trunc
+        trunc_map = {"hour": "hour", "day": "day", "month": "month"}
+        trunc_unit = trunc_map[aggregate]
+
+        stmt = (
+            select(
+                func.date_trunc(trunc_unit, SensorReading.timestamp).label("bucket"),
+                func.avg(SensorReading.value).label("avg_value"),
+                func.min(SensorReading.value).label("min_value"),
+                func.max(SensorReading.value).label("max_value"),
+                func.count(SensorReading.id).label("count"),
+                SensorReading.sensor_type,
+                SensorReading.unit,
+            )
+            .join(SensorStation)
+            .where(SensorStation.user_id == user.id)
+            .where(SensorReading.timestamp >= effective_start)
+            .group_by(
+                func.date_trunc(trunc_unit, SensorReading.timestamp),
+                SensorReading.sensor_type,
+                SensorReading.unit,
+            )
+            .order_by("bucket")
+            .limit(limit)
+        )
+
+        if station_id:
+            stmt = stmt.where(SensorReading.station_id == station_id)
+        if sensor_type:
+            stmt = stmt.where(SensorReading.sensor_type == sensor_type)
+        if end:
+            stmt = stmt.where(SensorReading.timestamp <= end)
+
+        result = await db.execute(stmt)
+        rows = result.all()
+        data = [
+            {
+                "bucket": r.bucket.isoformat() if r.bucket else None,
+                "avg_value": round(r.avg_value, 6) if r.avg_value else None,
+                "min_value": r.min_value,
+                "max_value": r.max_value,
+                "count": r.count,
+                "sensor_type": r.sensor_type,
+                "unit": r.unit,
+            }
+            for r in rows
+        ]
+        return StandardResponse(
+            data=data,
+            meta={"page": (offset // limit) + 1, "limit": limit, "total": len(data)},
+        )
+
+    # Raw query
+    stmt = (
+        select(SensorReading)
+        .join(SensorStation)
+        .where(SensorStation.user_id == user.id)
+        .where(SensorReading.timestamp >= effective_start)
     )
     if station_id:
         stmt = stmt.where(SensorReading.station_id == station_id)
     if sensor_type:
         stmt = stmt.where(SensorReading.sensor_type == sensor_type)
-    if start:
-        stmt = stmt.where(SensorReading.timestamp >= start)
     if end:
         stmt = stmt.where(SensorReading.timestamp <= end)
 
-    # Retention check based on tier
-    retention_days = {"free": 7, "pro": 90, "enterprise": 730}
-    max_retention = retention_days.get(user.tier, 7)
-    earliest_allowed = datetime.now(timezone.utc) - timedelta(days=max_retention)
-    if not start or start < earliest_allowed:
-        stmt = stmt.where(SensorReading.timestamp >= earliest_allowed)
+    # Count total for pagination
+    count_stmt = stmt.with_only_columns(func.count(SensorReading.id), maintain_order_from=False)
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar_one() or 0
 
-    if aggregate and aggregate != "none":
-        # Return raw for MVP; aggregation requires TimescaleDB functions or Python grouping
-        pass
-
-    stmt = stmt.order_by(SensorReading.timestamp.desc()).limit(limit)
+    stmt = stmt.order_by(SensorReading.timestamp.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)
     rows = result.scalars().all()
 
     return StandardResponse(
         data=[DataQueryResponse.model_validate(r).model_dump(mode="json") for r in rows],
-        meta={"page": 1, "limit": limit, "total": len(rows)},
+        meta={"page": (offset // limit) + 1, "limit": limit, "total": total},
     )
 
 

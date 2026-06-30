@@ -1,5 +1,7 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
+import hashlib
+import hmac
 import secrets
 import time
 from datetime import datetime, timezone
@@ -62,12 +64,24 @@ def extract_api_key(request: Request, x_api_key: Optional[str] = Header(None)) -
         return x_api_key
     auth = request.headers.get("Authorization", "")
     if auth.lower().startswith("bearer "):
-        # The value could be either a JWT or an API key.
-        # We distinguish by length: API keys are 64 hex chars.
         token = auth[7:].strip()
+        # API keys are 64 hex chars; JWTs are longer and contain dots
         if len(token) == 64 and all(c in "0123456789abcdef" for c in token.lower()):
             return token
     return None
+
+
+# ---------------------------------------------------------------------------
+# API key hashing
+# ---------------------------------------------------------------------------
+
+def _hash_key(raw_key: str) -> str:
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+
+def _extract_prefix(raw_key: str) -> str:
+    """First 8 chars of the key as prefix for fast lookup."""
+    return raw_key[:8].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -85,16 +99,18 @@ async def get_current_user_or_api_key(
     """
     api_key_val = extract_api_key(request, x_api_key)
     if api_key_val:
-        # Hash the provided key and look it up
-        key_hash = secrets.token_hex(32)  # dummy — we need to store raw key hash
-        # Since we store a hash of the key, we can't look it up directly by hashing again.
-        # For MVP, we iterate over the user's keys and compare. In production use Redis.
-        result = await db.execute(select(ApiKey))
+        prefix = _extract_prefix(api_key_val)
+        key_hash = _hash_key(api_key_val)
+        # O(1) lookup by prefix, then O(1) hash verification
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.key_prefix == prefix,
+                ApiKey.deleted_at.is_(None),
+            )
+        )
         keys = result.scalars().all()
         for api_key in keys:
-            # Compare using a simple hash check
-            from app.routers.apikeys import _hash_key
-            if api_key.key_hash == _hash_key(api_key_val):
+            if api_key.key_hash == key_hash:
                 if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
@@ -102,11 +118,13 @@ async def get_current_user_or_api_key(
                 # Update last_used_at
                 api_key.last_used_at = datetime.now(timezone.utc)
                 await db.commit()
-                user_result = await db.execute(select(User).where(User.id == api_key.user_id))
+                user_result = await db.execute(
+                    select(User).where(User.id == api_key.user_id, User.is_active == True)
+                )
                 user = user_result.scalar_one_or_none()
                 if user is None:
                     raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED, detail="API key owner not found"
+                        status_code=status.HTTP_401_UNAUTHORIZED, detail="API key owner not found or inactive"
                     )
                 # Attach rate limit info for dependency use later
                 request.state.api_key = api_key
@@ -128,11 +146,11 @@ async def get_current_user_or_api_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive"
         )
     return user
 
