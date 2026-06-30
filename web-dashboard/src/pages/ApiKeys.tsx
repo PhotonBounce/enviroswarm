@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
-import type { ApiKey } from '@/types'
+import type { ApiKey, ApiKeyCreateResponse } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 export default function ApiKeys() {
@@ -29,11 +29,9 @@ export default function ApiKeys() {
     if (!keyName.trim()) return
     try {
       const result = await createApiKey.mutateAsync(keyName.trim())
-      // SECURITY NOTE: On creation, the backend returns the raw API key in the
-      // `key_hash` field for one-time display. On listing, `key_hash` is the
-      // actual hash. The naming is misleading — this is a known backend contract
-      // quirk that should be clarified with the API team (raw_key vs key_hash).
-      setNewKey(result.key_hash)
+      // result.raw_key contains the one-time raw API key from the backend.
+      // This is intentionally distinct from key_hash (the hash shown in listings).
+      setNewKey(result.raw_key)
       setKeyName('')
     } catch {
       // error handled by mutation
@@ -148,10 +146,10 @@ export default function ApiKeys() {
           {newKey ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-emerald-600/30 bg-emerald-900/20 p-4">
-                <p className="text-sm font-medium text-emerald-400 mb-2">Your new API key:</p>
+                <p className="text-sm font-medium text-emerald-400 mb-2">Your new API key (raw key):</p>
                 <code className="block break-all rounded bg-muted p-2 text-xs font-mono">{newKey}</code>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Copy this now — you won&apos;t be able to see it again.
+                  Copy this raw key now — it is shown only once. The key list below displays hashed values for security.
                 </p>
               </div>
               <DialogFooter>

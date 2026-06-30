@@ -30,18 +30,34 @@ from generators.reading_generator import generate_all_readings
 # Configuration
 # ---------------------------------------------------------------------------
 API_BASE = "http://localhost:8000"
-DEMO_EMAIL = "demo@enviroswarm.local"
-DEMO_PASSWORD = "Demo12345!"
-DEMO_TIER = "enterprise"
+DEMO_EMAIL = os.getenv("DEMO_EMAIL", "demo@enviroswarm.local")
+DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "Demo12345!")
+DEMO_TIER = os.getenv("DEMO_TIER", "enterprise")
 
 TOTAL_STATIONS = 30
 DAYS_OF_HISTORY = 30
 INTERVAL_MINUTES = 15
 MISSING_RATE = 0.03
 OUTLIER_RATE = 0.01
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", "500"))
-BATCH_DELAY_SECONDS = float(os.getenv("BATCH_DELAY_SECONDS", "0.2"))
-DEFAULT_INGEST_TIMEOUT = float(os.getenv("INGEST_TIMEOUT", "30"))
+
+
+def _safe_int(env_var: str, default: int) -> int:
+    try:
+        return int(os.getenv(env_var, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(env_var: str, default: float) -> float:
+    try:
+        return float(os.getenv(env_var, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+
+BATCH_SIZE = _safe_int("BATCH_SIZE", 500)
+BATCH_DELAY_SECONDS = _safe_float("BATCH_DELAY_SECONDS", 0.2)
+DEFAULT_INGEST_TIMEOUT = _safe_float("INGEST_TIMEOUT", 30.0)
 
 # ---------------------------------------------------------------------------
 # HTTP Session with retries
@@ -62,8 +78,8 @@ def _make_session() -> requests.Session:
     return session
 
 
-def _api_url(path: str) -> str:
-    return f"{API_BASE.rstrip('/')}/{path.lstrip('/')}"
+def _api_url(api_base: str, path: str) -> str:
+    return f"{api_base.rstrip('/')}/{path.lstrip('/')}"
 
 
 def _unwrap(resp: requests.Response) -> Any:
@@ -85,10 +101,10 @@ def _unwrap(resp: requests.Response) -> Any:
 # Auth helpers
 # ---------------------------------------------------------------------------
 
-def register_user(session: requests.Session, email: str, password: str) -> Optional[Dict[str, Any]]:
+def register_user(session: requests.Session, email: str, password: str, api_base: str) -> Optional[Dict[str, Any]]:
     """Register a new demo user."""
     resp = session.post(
-        _api_url("/api/v1/auth/register"),
+        _api_url(api_base, "/api/v1/auth/register"),
         json={"email": email, "password": password},
         timeout=10,
     )
@@ -99,10 +115,10 @@ def register_user(session: requests.Session, email: str, password: str) -> Optio
     return _unwrap(resp)
 
 
-def login_user(session: requests.Session, email: str, password: str) -> str:
+def login_user(session: requests.Session, email: str, password: str, api_base: str) -> str:
     """Login and return JWT access token."""
     resp = session.post(
-        _api_url("/api/v1/auth/login"),
+        _api_url(api_base, "/api/v1/auth/login"),
         json={"email": email, "password": password},
         timeout=10,
     )
@@ -114,10 +130,10 @@ def login_user(session: requests.Session, email: str, password: str) -> str:
     return token
 
 
-def get_user_me(session: requests.Session, token: str) -> Dict[str, Any]:
+def get_user_me(session: requests.Session, token: str, api_base: str) -> Dict[str, Any]:
     """Get current user info (including tier)."""
     resp = session.get(
-        _api_url("/api/v1/auth/me"),
+        _api_url(api_base, "/api/v1/auth/me"),
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
@@ -125,10 +141,10 @@ def get_user_me(session: requests.Session, token: str) -> Dict[str, Any]:
     return _unwrap(resp)
 
 
-def get_pricing(session: requests.Session) -> List[Dict[str, Any]]:
+def get_pricing(session: requests.Session, api_base: str) -> List[Dict[str, Any]]:
     """Query backend pricing tiers dynamically."""
     resp = session.get(
-        _api_url("/api/v1/pricing"),
+        _api_url(api_base, "/api/v1/pricing"),
         timeout=10,
     )
     resp.raise_for_status()
@@ -148,10 +164,10 @@ def _station_limit_from_pricing(pricing: List[Dict[str, Any]], tier: str) -> int
     return 1
 
 
-def subscribe_user(session: requests.Session, token: str, tier: str, duration_months: int = 1) -> Dict[str, Any]:
+def subscribe_user(session: requests.Session, token: str, tier: str, api_base: str, duration_months: int = 1) -> Dict[str, Any]:
     """Upgrade user tier via the billing API."""
     resp = session.post(
-        _api_url("/api/v1/subscribe"),
+        _api_url(api_base, "/api/v1/subscribe"),
         json={"tier": tier, "duration_months": duration_months},
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
@@ -164,14 +180,14 @@ def subscribe_user(session: requests.Session, token: str, tier: str, duration_mo
 # Station helpers
 # ---------------------------------------------------------------------------
 
-def list_stations(session: requests.Session, token: str) -> List[Dict[str, Any]]:
+def list_stations(session: requests.Session, token: str, api_base: str) -> List[Dict[str, Any]]:
     """List all stations for the authenticated user."""
     stations: List[Dict[str, Any]] = []
     offset = 0
     limit = 100
     while True:
         resp = session.get(
-            _api_url("/api/v1/stations"),
+            _api_url(api_base, "/api/v1/stations"),
             params={"limit": limit, "offset": offset},
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
@@ -194,17 +210,17 @@ def list_stations(session: requests.Session, token: str) -> List[Dict[str, Any]]
     return stations
 
 
-def delete_station(session: requests.Session, token: str, station_id: str) -> None:
+def delete_station(session: requests.Session, token: str, station_id: str, api_base: str) -> None:
     """Soft-delete a station."""
     resp = session.delete(
-        _api_url(f"/api/v1/stations/{station_id}"),
+        _api_url(api_base, f"/api/v1/stations/{station_id}"),
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
     resp.raise_for_status()
 
 
-def create_station_api(session: requests.Session, token: str, station: Dict[str, Any]) -> Dict[str, Any]:
+def create_station_api(session: requests.Session, token: str, station: Dict[str, Any], api_base: str) -> Dict[str, Any]:
     """Create a station via the backend API."""
     payload = {
         "name": station["name"],
@@ -214,7 +230,7 @@ def create_station_api(session: requests.Session, token: str, station: Dict[str,
         "status": station.get("status", "active"),
     }
     resp = session.post(
-        _api_url("/api/v1/stations"),
+        _api_url(api_base, "/api/v1/stations"),
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
@@ -232,6 +248,7 @@ def _ingest_with_payload(
     token: str,
     payload: Dict[str, Any],
     ingest_timeout: float,
+    api_base: str,
 ) -> requests.Response:
     """POST a pre-built ingest payload with gzip and idempotency."""
     headers = {
@@ -243,7 +260,7 @@ def _ingest_with_payload(
     compressed = gzip.compress(raw_json)
     headers["Content-Encoding"] = "gzip"
     return session.post(
-        _api_url("/api/v1/ingest"),
+        _api_url(api_base, "/api/v1/ingest"),
         data=compressed,
         headers=headers,
         timeout=ingest_timeout,
@@ -254,6 +271,7 @@ def ingest_bulk(
     session: requests.Session,
     token: str,
     readings: List[Dict[str, Any]],
+    api_base: str,
     ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
 ) -> Dict[str, Any]:
     """Submit a batch of readings to the ingest API.
@@ -264,7 +282,7 @@ def ingest_bulk(
         return {"inserted": 0}
 
     payload = {"readings": readings}
-    resp = _ingest_with_payload(session, token, payload, ingest_timeout)
+    resp = _ingest_with_payload(session, token, payload, ingest_timeout, api_base)
 
     if resp.status_code == 413:
         if len(readings) == 1:
@@ -274,8 +292,8 @@ def ingest_bulk(
                 f"Body sample: {json.dumps(payload)[:500]}"
             )
         mid = len(readings) // 2
-        first = ingest_bulk(session, token, readings[:mid], ingest_timeout)
-        second = ingest_bulk(session, token, readings[mid:], ingest_timeout)
+        first = ingest_bulk(session, token, readings[:mid], api_base, ingest_timeout)
+        second = ingest_bulk(session, token, readings[mid:], api_base, ingest_timeout)
         inserted = 0
         for part in (first, second):
             if isinstance(part, dict):
@@ -309,14 +327,12 @@ def run_seed(
 
     Returns a summary dict with counts and timing.
     """
-    global API_BASE
-    if api_base:
-        API_BASE = api_base
+    effective_api_base = api_base or API_BASE
 
     start_time = time.time()
     summary = {
         "dry_run": dry_run,
-        "api_base": API_BASE,
+        "api_base": effective_api_base,
         "stations_created": 0,
         "readings_generated": 0,
         "batches_sent": 0,
@@ -342,7 +358,7 @@ def run_seed(
             deadline = time.monotonic() + 60.0
             while time.monotonic() < deadline:
                 try:
-                    probe = session.get(_api_url("/api/v1/pricing"), timeout=5)
+                    probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
                     if probe.status_code < 500:
                         print("  Backend is up.")
                         break
@@ -354,13 +370,13 @@ def run_seed(
 
         print(f"\n[1/6] Registering demo user ({DEMO_EMAIL})...")
         try:
-            register_user(session, DEMO_EMAIL, DEMO_PASSWORD)
+            register_user(session, DEMO_EMAIL, DEMO_PASSWORD, effective_api_base)
         except Exception as e:
             print(f"  Registration note: {e}")
 
         print("[2/6] Logging in...")
         try:
-            token = login_user(session, DEMO_EMAIL, DEMO_PASSWORD)
+            token = login_user(session, DEMO_EMAIL, DEMO_PASSWORD, effective_api_base)
             print("  Authenticated successfully.")
         except Exception as e:
             print(f"  FATAL: Could not login: {e}")
@@ -369,15 +385,15 @@ def run_seed(
 
         print(f"[3/6] Upgrading tier to {DEMO_TIER}...")
         try:
-            subscribe_user(session, token, DEMO_TIER, duration_months=1)
+            subscribe_user(session, token, DEMO_TIER, effective_api_base, duration_months=1)
             print(f"  Tier upgraded to {DEMO_TIER}.")
         except Exception as e:
             print(f"  Tier upgrade note: {e}")
             # Fall back to querying current tier and pricing so we can adapt station count
             try:
-                me = get_user_me(session, token)
+                me = get_user_me(session, token, effective_api_base)
                 actual_tier = me.get("tier", "free")
-                pricing = get_pricing(session)
+                pricing = get_pricing(session, effective_api_base)
                 max_stations = _station_limit_from_pricing(pricing, actual_tier)
                 if stations > max_stations:
                     print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
@@ -392,12 +408,12 @@ def run_seed(
         if cleanup:
             print("[4/6] Cleaning up existing demo stations...")
             try:
-                existing = list_stations(session, token)
+                existing = list_stations(session, token, effective_api_base)
                 for s in existing:
                     sid = s.get("id")
                     if sid:
                         try:
-                            delete_station(session, token, sid)
+                            delete_station(session, token, sid, effective_api_base)
                             print(f"  Deleted station {sid}")
                         except Exception as del_err:
                             print(f"  Could not delete {sid}: {del_err}")
@@ -406,7 +422,7 @@ def run_seed(
         else:
             # Check for existing stations to avoid duplicates
             try:
-                existing = list_stations(session, token)
+                existing = list_stations(session, token, effective_api_base)
                 if existing:
                     print(f"  Found {len(existing)} existing station(s). Skipping creation to avoid duplicates.")
                     print("  Use --cleanup to remove them first.")
@@ -419,7 +435,7 @@ def run_seed(
                     print("SUMMARY")
                     print("=" * 60)
                     print(f"  Mode:          LIVE")
-                    print(f"  API Base:      {API_BASE}")
+                    print(f"  API Base:      {effective_api_base}")
                     print(f"  Stations:      {summary['stations_created']}")
                     print(f"  Readings:      0")
                     print(f"  Batches sent:  0")
@@ -449,7 +465,7 @@ def run_seed(
             created_stations.append(station)
         else:
             try:
-                api_station = create_station_api(session, token, station)
+                api_station = create_station_api(session, token, station, effective_api_base)
                 # Merge API response (which may contain real DB id) with our local data
                 merged = {
                     **station,
@@ -496,7 +512,7 @@ def run_seed(
             batch_num = (i // batch_size) + 1
             batch_start = time.monotonic()
             try:
-                result = ingest_bulk(session, token, batch, ingest_timeout=ingest_timeout)
+                result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
                 summary["batches_sent"] += 1
                 inserted = result.get("inserted", "?") if isinstance(result, dict) else "?"
                 print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
@@ -530,7 +546,7 @@ def run_seed(
     print("SUMMARY")
     print("=" * 60)
     print(f"  Mode:          {'DRY RUN' if dry_run else 'LIVE'}")
-    print(f"  API Base:      {API_BASE}")
+    print(f"  API Base:      {effective_api_base}")
     print(f"  Stations:      {summary['stations_created']}")
     print(f"  Readings:      {summary['readings_generated']:,}")
     print(f"  Batches sent:  {summary['batches_sent']}")

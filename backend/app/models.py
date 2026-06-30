@@ -10,9 +10,11 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -90,6 +92,10 @@ class SensorStation(Base):
 
     __table_args__ = (
         CheckConstraint("status IN ('active', 'inactive', 'maintenance')", name="ck_station_status"),
+        Index("ix_sensor_stations_user_id", "user_id"),
+        Index("ix_sensor_stations_latitude", "latitude"),
+        Index("ix_sensor_stations_longitude", "longitude"),
+        Index("ix_sensor_stations_deleted_at", "deleted_at"),
     )
 
 
@@ -121,6 +127,10 @@ class SensorReading(Base):
 
     __table_args__ = (
         CheckConstraint(f"sensor_type IN ({', '.join(repr(t) for t in ['air_quality', 'temperature', 'humidity', 'noise_level', 'radiation', 'water_quality', 'co2', 'pm25', 'pm10', 'voc'])})", name="ck_reading_sensor_type"),
+        Index("ix_sensor_readings_station_id", "station_id"),
+        Index("ix_sensor_readings_sensor_type", "sensor_type"),
+        Index("ix_sensor_readings_timestamp", "timestamp"),
+        Index("ix_sensor_readings_deleted_at", "deleted_at"),
     )
 
 
@@ -208,5 +218,6 @@ class IdempotencyKey(Base):
     )
 
     __table_args__ = (
-        CheckConstraint("expires_at > created_at", name="ck_idempotency_expires_after_created"),
+        CheckConstraint("expires_at >= created_at", name="ck_idempotency_expires_after_created"),
+        UniqueConstraint("user_id", "key_hash", name="uq_idempotency_user_key"),
     )

@@ -8,32 +8,42 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const isLoggingIn = useRef(false);
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (): Promise<User | null> => {
     try {
       const token = await SecureStore.getItemAsync('access_token');
       if (!token) {
         setUser(null);
         setLoading(false);
-        return;
+        return null;
       }
       const res = await apiClient.get<ApiResponse<User>>('/me');
       if (res.data?.success) {
         setUser(res.data.data);
+        return res.data.data;
       } else {
         await SecureStore.deleteItemAsync('access_token');
         setUser(null);
+        throw new Error(res.data?.error || 'Session validation failed');
       }
     } catch (err: any) {
       console.error('Auth check failed:', err?.message || err);
-      await SecureStore.deleteItemAsync('access_token');
-      setUser(null);
+      // Only clear the session on 401 (unauthorized). For 403, 500, or network
+      // errors, preserve the token so the user can retry later.
+      if (err?.response?.status === 401) {
+        await SecureStore.deleteItemAsync('access_token');
+        setUser(null);
+      }
+      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    checkAuth();
+    checkAuth().catch(() => {
+      // Non-401 errors are intentionally swallowed on initial mount so the
+      // token is preserved and the user can retry later.
+    });
   }, [checkAuth]);
 
   // Listen for 401 events from the API interceptor
@@ -60,7 +70,10 @@ export function useAuth() {
       } catch (storeErr) {
         throw new Error('Failed to save session. Please check device storage.');
       }
-      await checkAuth();
+      const userData = await checkAuth();
+      if (!userData) {
+        throw new Error('Session validation failed after login. Please try again.');
+      }
     } finally {
       isLoggingIn.current = false;
     }
@@ -82,7 +95,10 @@ export function useAuth() {
       } catch (storeErr) {
         throw new Error('Failed to save session. Please check device storage.');
       }
-      await checkAuth();
+      const userData = await checkAuth();
+      if (!userData) {
+        throw new Error('Session validation failed after registration. Please try again.');
+      }
     } finally {
       isLoggingIn.current = false;
     }

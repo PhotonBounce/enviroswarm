@@ -44,6 +44,18 @@ export interface SensorReading {
   metadata?: Record<string, unknown>
 }
 
+export interface ApiKeyCreateResponse {
+  id: string
+  user_id: string
+  name: string
+  raw_key: string
+  permissions: { read: boolean; write: boolean }
+  rate_limit_per_min: number
+  last_used_at?: string
+  expires_at?: string
+  created_at: string
+}
+
 export interface ApiKey {
   id: string
   user_id: string

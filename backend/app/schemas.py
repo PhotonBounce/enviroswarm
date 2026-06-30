@@ -41,6 +41,13 @@ class UserRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
 
+    @field_validator("password", mode="after")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        from app.auth import validate_password
+        validate_password(v)
+        return v
+
 class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
@@ -147,6 +154,15 @@ class SensorReadingPayload(BaseModel):
     def validate_sensor_type(cls, v: str) -> str:
         if v not in SENSOR_TYPES:
             raise ValueError(f"Invalid sensor_type. Must be one of: {SENSOR_TYPES}")
+        return v
+
+    @field_validator("timestamp", mode="after")
+    @classmethod
+    def validate_timestamp(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
         return v
 
 class IngestRequest(BaseModel):

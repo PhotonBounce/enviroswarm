@@ -17,11 +17,13 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 })
 
-// SECURITY WARNING: Storing JWT in localStorage is vulnerable to XSS attacks.
-// In production, prefer httpOnly secure cookies or a service-worker token vault.
-// The backend must support cookie-based auth for a true httpOnly solution.
+// CRITICAL SECURITY WARNING: Reading the JWT from sessionStorage and attaching it
+// to every request exposes the token to XSS. The long-term fix is to move to
+// httpOnly secure cookies managed by the backend, so the browser sends the
+// cookie automatically and the token is never accessible to JavaScript.
 api.interceptors.request.use(
   (config) => {
     const token = sessionStorage.getItem('enviroswarm_token')

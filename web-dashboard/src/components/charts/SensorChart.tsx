@@ -29,16 +29,14 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
     )
   }
 
-  // Group data by timestamp and sensor_type for multi-line chart
+  // Group data by full ISO timestamp and sensor_type for multi-line chart.
+  // Using the full timestamp prevents data loss when multiple readings occur
+  // within the same minute (previously collisions were caused by minute-level
+  // formatting used as the Map key).
   const chartData = useMemo(() => {
     const timestamps = new Map<string, Record<string, number>>()
     for (const r of data) {
-      const ts = new Date(r.timestamp).toLocaleString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+      const ts = r.timestamp
       if (!timestamps.has(ts)) timestamps.set(ts, {})
       timestamps.get(ts)![r.sensor_type] = r.value
     }
@@ -69,6 +67,14 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
           axisLine={false}
           angle={-45}
           height={60}
+          tickFormatter={(ts: string) =>
+            new Date(ts).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          }
         />
         <YAxis
           stroke="#9ca3af"

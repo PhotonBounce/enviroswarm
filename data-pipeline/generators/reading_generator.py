@@ -6,6 +6,23 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 
+# City-specific UTC offsets (standard time, approximate)
+_CITY_OFFSETS = {
+    "New York City": -5,
+    "Los Angeles": -8,
+    "London": 0,
+    "Tokyo": 9,
+    "Berlin": 1,
+}
+
+
+def _local_hour(timestamp: datetime, city: str) -> int:
+    """Convert UTC timestamp to local solar hour for the given city."""
+    offset = _CITY_OFFSETS.get(city, 0)
+    local_ts = timestamp + timedelta(hours=offset)
+    return local_ts.hour
+
+
 def _daily_seasonal_factor(hour: int, base_phase: float = 0.0) -> float:
     """Return a diurnal factor (-1 to 1) based on hour of day."""
     # Simple sinusoidal: coldest ~6am, warmest ~noon (12h)
@@ -29,7 +46,7 @@ def _temperature_value(
     }
     base = base_temp if base_temp is not None else city_bases.get(city, 15.0)
     
-    hour = timestamp.hour
+    hour = _local_hour(timestamp, city)
     day_of_year = timestamp.utctimetuple().tm_yday
     
     # Seasonal variation (coldest in Jan, warmest in July)
@@ -45,11 +62,11 @@ def _temperature_value(
     return round(value, 2)
 
 
-def _humidity_value(timestamp: datetime, temperature: float) -> float:
+def _humidity_value(timestamp: datetime, temperature: float, city: str) -> float:
     """Generate humidity % roughly inversely correlated with temperature."""
     # Higher temp often means lower humidity (simplified)
     base = 70 - (temperature * 0.8)
-    hour = timestamp.hour
+    hour = _local_hour(timestamp, city)
     diurnal = 10 * math.sin((hour - 3) / 24 * 2 * math.pi)
     noise = random.gauss(0, 8)
     value = base + diurnal + noise
@@ -208,7 +225,7 @@ def generate_readings_for_station(
                 value = temp
                 unit = "°C"
             elif st == "humidity":
-                value = _humidity_value(ts, temp)
+                value = _humidity_value(ts, temp, city)
                 unit = "%"
             elif st == "co2":
                 value = _co2_value(city)
@@ -220,7 +237,7 @@ def generate_readings_for_station(
                 value = pm10
                 unit = "µg/m³"
             elif st == "noise_level":
-                value = _noise_level_value(city, ts.hour)
+                value = _noise_level_value(city, _local_hour(ts, city))
                 unit = "dB"
             elif st == "radiation":
                 value = _radiation_value()

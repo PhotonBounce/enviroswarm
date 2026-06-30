@@ -34,7 +34,7 @@ python seed_demo.py
 
 `seed_demo.py` performs the following steps:
 
-1. **Registers a demo user** (`demo@enviroswarm.local` / `demo12345`) if not already present
+1. **Registers a demo user** (`demo@enviroswarm.local` / `Demo12345!`) if not already present
 2. **Logs in** to obtain a JWT access token
 3. **Creates 30 simulated sensor stations** across 5 cities:
    - New York City, USA

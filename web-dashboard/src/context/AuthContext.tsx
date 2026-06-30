@@ -56,8 +56,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const login = useCallback((newToken: string, newUser: User) => {
-    // SECURITY NOTE: sessionStorage reduces XSS persistence compared to localStorage.
-    // For full protection, migrate to httpOnly secure cookies backed by the server.
+    // CRITICAL SECURITY WARNING: sessionStorage is vulnerable to XSS. Any injected
+    // script can read `enviroswarm_token` and impersonate the user. We use
+    // sessionStorage here because the backend does not yet support httpOnly
+    // secure cookies. The recommended remediation is to move token storage to
+    // httpOnly secure cookies managed by the backend, or to a service-worker
+    // token vault. Do not use localStorage — it persists across sessions and
+    // increases the attack surface. A strict Content-Security-Policy header has
+    // been added to index.html to mitigate reflected XSS vectors.
     sessionStorage.setItem('enviroswarm_token', newToken)
     sessionStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
     setToken(newToken)

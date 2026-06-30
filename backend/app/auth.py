@@ -120,6 +120,21 @@ def decode_refresh_token(token: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Refresh token revocation (in-memory; replace with Redis in production)
+# ---------------------------------------------------------------------------
+
+_refresh_token_blacklist: set = set()
+
+
+def revoke_refresh_token(jti: str) -> None:
+    _refresh_token_blacklist.add(jti)
+
+
+def is_refresh_token_revoked(jti: str) -> bool:
+    return jti in _refresh_token_blacklist
+
+
+# ---------------------------------------------------------------------------
 # Current user dependency
 # ---------------------------------------------------------------------------
 
