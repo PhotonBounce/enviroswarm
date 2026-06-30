@@ -5,7 +5,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -84,6 +84,14 @@ async def health() -> dict:
             status_code=503,
             content={"success": False, "data": {"status": "unhealthy", "version": "1.0.0"}, "error": "Database unavailable"},
         )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"success": False, "data": None, "error": exc.detail},
+    )
 
 
 # Global exception handler — never leak internal details in production

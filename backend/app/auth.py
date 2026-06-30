@@ -108,6 +108,13 @@ def _decode_token(token: str, expected_type: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing sub claim",
         )
+    if expected_type == "refresh":
+        jti = payload.get("jti")
+        if jti and is_refresh_token_revoked(jti):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been revoked",
+            )
     return payload
 
 

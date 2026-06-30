@@ -8,7 +8,7 @@ from typing import Optional
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.dependencies import require_permission
+from app.dependencies import require_permission, rate_limit_dependency
 from app.models import SensorStation, SensorReading, User
 from app.schemas import StandardResponse, StationCreateRequest, StationUpdateRequest, StationResponse
 
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 async def create_station(
     body: StationCreateRequest,
     user: User = Depends(require_permission("write")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Tier limits — lock user row to prevent race condition
@@ -63,6 +64,7 @@ async def create_station(
 @router.get("", response_model=StandardResponse)
 async def list_stations(
     user: User = Depends(require_permission("read")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -91,6 +93,7 @@ async def list_stations(
 async def get_station(
     station_id: UUID,
     user: User = Depends(require_permission("read")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -115,6 +118,7 @@ async def update_station(
     station_id: UUID,
     body: StationUpdateRequest,
     user: User = Depends(require_permission("write")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -151,6 +155,7 @@ async def update_station(
 async def delete_station(
     station_id: UUID,
     user: User = Depends(require_permission("write")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(

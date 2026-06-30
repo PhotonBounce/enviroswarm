@@ -13,6 +13,7 @@ from app.auth import (
     verify_password,
     validate_password,
     get_current_user,
+    revoke_refresh_token,
 )
 from app.database import get_db
 from app.models import User
@@ -33,6 +34,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(
     body: UserRegisterRequest, db: AsyncSession = Depends(get_db)
 ) -> StandardResponse:
+    # Rate limit registration by email
+    if not await check_rate_limit(f"register:{body.email}", "/auth/register", 3):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts",
+        )
+
     # Check duplicate email
     result = await db.execute(
         select(User).where(User.email == body.email, User.deleted_at.is_(None))
@@ -106,8 +114,16 @@ async def refresh_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
+
+    # Rate limit refresh by user_id
+    if not await check_rate_limit(f"refresh:{user_id}", "/auth/refresh", 10):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many refresh attempts",
+        )
+
     try:
-        user_uuid = uuid.UUID(user_id)
+        user_uuid = UUID(user_id)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user ID in token"
@@ -127,6 +143,12 @@ async def refresh_token(
 
     new_access = create_access_token(str(user.id))
     new_refresh = create_refresh_token(str(user.id))
+
+    # Revoke old refresh token
+    old_jti = payload.get("jti")
+    if old_jti:
+        revoke_refresh_token(old_jti)
+
     return StandardResponse(
         data=TokenResponse(
             access_token=new_access,

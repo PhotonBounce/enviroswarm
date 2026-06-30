@@ -1,10 +1,12 @@
 """Data ingestion router."""
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select, func, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -34,8 +36,9 @@ async def ingest(
 
     # Idempotency check — transactional via DB
     idempotency_key = request.headers.get("X-Idempotency-Key")
+    key_hash = None
     if idempotency_key:
-        key_hash = f"{user.id}:{idempotency_key}"
+        key_hash = hashlib.sha256(f"{user.id}:{idempotency_key}".encode()).hexdigest()
         idem_result = await db.execute(
             select(IdempotencyKey).where(
                 IdempotencyKey.user_id == user.id,
@@ -129,9 +132,8 @@ async def ingest(
         db.add_all(readings)
 
         # Store idempotency key as part of the same transaction
+        result_data = IngestResponse(inserted=len(readings)).model_dump(mode="json")
         if idempotency_key:
-            key_hash = f"{user.id}:{idempotency_key}"
-            result_data = IngestResponse(inserted=len(readings)).model_dump(mode="json")
             db.add(
                 IdempotencyKey(
                     user_id=user.id,
@@ -144,9 +146,23 @@ async def ingest(
         await db.commit()
 
         return StandardResponse(data=result_data if idempotency_key else IngestResponse(inserted=len(readings)).model_dump(mode="json"))
-    except HTTPException:
+    except IntegrityError:
         await db.rollback()
-        raise
+        if idempotency_key and key_hash:
+            idem_result = await db.execute(
+                select(IdempotencyKey).where(
+                    IdempotencyKey.user_id == user.id,
+                    IdempotencyKey.key_hash == key_hash,
+                    IdempotencyKey.expires_at > datetime.now(timezone.utc),
+                )
+            )
+            cached = idem_result.scalar_one_or_none()
+            if cached:
+                return StandardResponse(data=cached.response)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Idempotency conflict or duplicate key",
+        )
     except Exception:
         await db.rollback()
         raise

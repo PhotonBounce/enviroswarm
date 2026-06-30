@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.dependencies import require_tier, require_permission
+from app.dependencies import require_tier, require_permission, rate_limit_dependency
 from app.models import ApiKey, User
 from app.schemas import (
     StandardResponse,
@@ -31,6 +31,8 @@ def _generate_api_key() -> str:
 async def create_api_key(
     body: ApiKeyCreateRequest,
     user: User = Depends(require_tier("pro", "enterprise")),
+    _perm: User = Depends(require_permission("write")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Lock user row to prevent race condition on tier limit
@@ -81,6 +83,7 @@ async def create_api_key(
 @router.get("", response_model=StandardResponse)
 async def list_api_keys(
     user: User = Depends(require_permission("read")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -96,6 +99,7 @@ async def list_api_keys(
 async def revoke_api_key(
     key_id: UUID,
     user: User = Depends(require_permission("write")),
+    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(

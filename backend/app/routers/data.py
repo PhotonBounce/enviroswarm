@@ -33,6 +33,7 @@ async def query_data(
     offset: int = Query(0, ge=0),
     aggregate: Optional[str] = Query(None, pattern="^(none|hour|day|month)$"),
     user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Retention check based on tier
@@ -140,6 +141,7 @@ async def nearby(
     radius_km: float = Query(10, ge=0.1, le=500),
     sensor_type: Optional[str] = Query(None, pattern="^(air_quality|temperature|humidity|noise_level|radiation|water_quality|co2|pm25|pm10|voc)$"),
     user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Find stations near a lat/lon using haversine formula (Python side).
