@@ -6,11 +6,17 @@ from pathlib import Path
 from typing import List
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parent.parent / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # Database
     database_url: str = "postgresql+asyncpg://enviroswarm:enviroswarm@localhost:5432/enviroswarm"
@@ -41,11 +47,6 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
-
-    class Config:
-        env_file = str(Path(__file__).resolve().parent.parent / ".env")
-        env_file_encoding = "utf-8"
-        extra = "ignore"
 
 
 @lru_cache

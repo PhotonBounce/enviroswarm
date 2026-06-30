@@ -19,14 +19,19 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
+        kwargs = {
+            "echo": False,
+            "future": True,
+            "pool_pre_ping": settings.db_pool_pre_ping,
+            "pool_recycle": settings.db_pool_recycle,
+        }
+        # SQLite does not support pool_size / max_overflow
+        if not settings.database_url.startswith("sqlite"):
+            kwargs["pool_size"] = settings.db_pool_size
+            kwargs["max_overflow"] = settings.db_max_overflow
         _engine = create_async_engine(
             settings.database_url,
-            echo=False,
-            future=True,
-            pool_pre_ping=settings.db_pool_pre_ping,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_max_overflow,
-            pool_recycle=settings.db_pool_recycle,
+            **kwargs,
         )
     return _engine
 
