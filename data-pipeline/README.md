@@ -50,7 +50,7 @@ python seed_demo.py
 
 | Sensor Type | Unit | Range | Notes |
 |-------------|------|-------|-------|
-| `temperature` | °C | -10 to 40 | Seasonal bias applied per city |
+| `temperature` | °C | -20 to 40 (outliers: -80 to +90) | Seasonal bias applied per city |
 | `humidity` | % | 10 to 100 | Inversely correlated with temperature |
 | `co2` | ppm | 350 to 600 | Higher in urban areas |
 | `pm25` | µg/m³ | 0 to 150 | Higher in dense cities |

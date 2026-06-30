@@ -9,9 +9,13 @@ Usage:
 """
 
 import argparse
+import gzip
+import json
+import os
 import random
 import sys
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
@@ -35,8 +39,9 @@ DAYS_OF_HISTORY = 30
 INTERVAL_MINUTES = 15
 MISSING_RATE = 0.03
 OUTLIER_RATE = 0.01
-BATCH_SIZE = 500
-BATCH_DELAY_SECONDS = 0.2
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", "500"))
+BATCH_DELAY_SECONDS = float(os.getenv("BATCH_DELAY_SECONDS", "0.2"))
+DEFAULT_INGEST_TIMEOUT = float(os.getenv("INGEST_TIMEOUT", "30"))
 
 # ---------------------------------------------------------------------------
 # HTTP Session with retries
@@ -120,12 +125,35 @@ def get_user_me(session: requests.Session, token: str) -> Dict[str, Any]:
     return _unwrap(resp)
 
 
+def get_pricing(session: requests.Session) -> List[Dict[str, Any]]:
+    """Query backend pricing tiers dynamically."""
+    resp = session.get(
+        _api_url("/api/v1/pricing"),
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = _unwrap(resp)
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and "data" in data:
+        return data["data"]
+    return []
+
+
+def _station_limit_from_pricing(pricing: List[Dict[str, Any]], tier: str) -> int:
+    """Extract station limit for a given tier from pricing data."""
+    for item in pricing:
+        if isinstance(item, dict) and item.get("name") == tier:
+            return item.get("stations", 1)
+    return 1
+
+
 def subscribe_user(session: requests.Session, token: str, tier: str, duration_months: int = 1) -> Dict[str, Any]:
     """Upgrade user tier via the billing API."""
     resp = session.post(
         _api_url("/api/v1/subscribe"),
         json={"tier": tier, "duration_months": duration_months},
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
     resp.raise_for_status()
@@ -188,7 +216,7 @@ def create_station_api(session: requests.Session, token: str, station: Dict[str,
     resp = session.post(
         _api_url("/api/v1/stations"),
         json=payload,
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
     resp.raise_for_status()
@@ -199,16 +227,65 @@ def create_station_api(session: requests.Session, token: str, station: Dict[str,
 # Ingest helper
 # ---------------------------------------------------------------------------
 
-def ingest_bulk(session: requests.Session, token: str, readings: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Submit a batch of readings to the ingest API."""
+def _ingest_with_payload(
+    session: requests.Session,
+    token: str,
+    payload: Dict[str, Any],
+    ingest_timeout: float,
+) -> requests.Response:
+    """POST a pre-built ingest payload with gzip and idempotency."""
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-Idempotency-Key": str(uuid.uuid4()),
+    }
+    raw_json = json.dumps(payload).encode("utf-8")
+    compressed = gzip.compress(raw_json)
+    headers["Content-Encoding"] = "gzip"
+    return session.post(
+        _api_url("/api/v1/ingest"),
+        data=compressed,
+        headers=headers,
+        timeout=ingest_timeout,
+    )
+
+
+def ingest_bulk(
+    session: requests.Session,
+    token: str,
+    readings: List[Dict[str, Any]],
+    ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
+) -> Dict[str, Any]:
+    """Submit a batch of readings to the ingest API.
+
+    Handles 413 Payload Too Large by splitting the batch in half and retrying.
+    """
     if not readings:
         return {"inserted": 0}
-    resp = session.post(
-        _api_url("/api/v1/ingest"),
-        json={"readings": readings},
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        timeout=30,
-    )
+
+    payload = {"readings": readings}
+    resp = _ingest_with_payload(session, token, payload, ingest_timeout)
+
+    if resp.status_code == 413:
+        if len(readings) == 1:
+            # Cannot split further
+            raise RuntimeError(
+                f"413 Payload Too Large even for a single reading. "
+                f"Body sample: {json.dumps(payload)[:500]}"
+            )
+        mid = len(readings) // 2
+        first = ingest_bulk(session, token, readings[:mid], ingest_timeout)
+        second = ingest_bulk(session, token, readings[mid:], ingest_timeout)
+        inserted = 0
+        for part in (first, second):
+            if isinstance(part, dict):
+                inserted += part.get("inserted", 0)
+        return {"inserted": inserted}
+
+    if resp.status_code >= 400:
+        sample = json.dumps(payload)[:500]
+        raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]} | body sample: {sample}")
+
     resp.raise_for_status()
     return _unwrap(resp)
 
@@ -223,6 +300,10 @@ def run_seed(
     cleanup: bool = False,
     stations: int = TOTAL_STATIONS,
     days: int = DAYS_OF_HISTORY,
+    batch_size: int = BATCH_SIZE,
+    batch_delay: float = BATCH_DELAY_SECONDS,
+    ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
+    wait_for_backend: bool = False,
 ) -> Dict[str, Any]:
     """Execute the full demo seeding pipeline.
 
@@ -243,8 +324,8 @@ def run_seed(
         "elapsed_seconds": 0.0,
     }
 
-    if BATCH_SIZE <= 0:
-        raise ValueError("BATCH_SIZE must be > 0")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be > 0")
 
     # ------------------------------------------------------------------
     # 1. Auth
@@ -255,6 +336,21 @@ def run_seed(
         print("=" * 60)
 
         session = _make_session()
+
+        if wait_for_backend:
+            print("\n[0/6] Waiting for backend to become available...")
+            deadline = time.monotonic() + 60.0
+            while time.monotonic() < deadline:
+                try:
+                    probe = session.get(_api_url("/api/v1/pricing"), timeout=5)
+                    if probe.status_code < 500:
+                        print("  Backend is up.")
+                        break
+                except Exception:
+                    pass
+                time.sleep(1.0)
+            else:
+                print("  WARNING: Backend did not respond within 60s, continuing anyway...")
 
         print(f"\n[1/6] Registering demo user ({DEMO_EMAIL})...")
         try:
@@ -277,12 +373,12 @@ def run_seed(
             print(f"  Tier upgraded to {DEMO_TIER}.")
         except Exception as e:
             print(f"  Tier upgrade note: {e}")
-            # Fall back to querying current tier so we can adapt station count
+            # Fall back to querying current tier and pricing so we can adapt station count
             try:
                 me = get_user_me(session, token)
                 actual_tier = me.get("tier", "free")
-                tier_limits = {"free": 1, "pro": 10, "enterprise": 9999}
-                max_stations = tier_limits.get(actual_tier, 1)
+                pricing = get_pricing(session)
+                max_stations = _station_limit_from_pricing(pricing, actual_tier)
                 if stations > max_stations:
                     print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
                     stations = max_stations
@@ -392,24 +488,36 @@ def run_seed(
     # 4. Ingest in Batches
     # ------------------------------------------------------------------
     if not dry_run:
-        print(f"\n[7/7] Submitting readings in batches of {BATCH_SIZE}...")
-        total_batches = (len(readings) + BATCH_SIZE - 1) // BATCH_SIZE
-        for i in range(0, len(readings), BATCH_SIZE):
-            batch = readings[i : i + BATCH_SIZE]
-            batch_num = (i // BATCH_SIZE) + 1
+        print(f"\n[7/7] Submitting readings in batches of {batch_size}...")
+        total_batches = (len(readings) + batch_size - 1) // batch_size
+        adaptive_delay = batch_delay
+        for i in range(0, len(readings), batch_size):
+            batch = readings[i : i + batch_size]
+            batch_num = (i // batch_size) + 1
+            batch_start = time.monotonic()
             try:
-                result = ingest_bulk(session, token, batch)
+                result = ingest_bulk(session, token, batch, ingest_timeout=ingest_timeout)
                 summary["batches_sent"] += 1
                 inserted = result.get("inserted", "?") if isinstance(result, dict) else "?"
                 print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
             except Exception as e:
                 summary["api_errors"] += 1
-                print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e}")
+                sample = json.dumps({"readings": batch[:2]})[:500]
+                print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
+
+            # Adaptive rate-limiting: if request took > 2s, increase delay;
+            # if request was fast, slowly decrease toward base delay.
+            elapsed_req = time.monotonic() - batch_start
+            if elapsed_req > 2.0:
+                adaptive_delay = min(adaptive_delay * 1.5, 5.0)
+            elif elapsed_req < 0.5 and adaptive_delay > batch_delay:
+                adaptive_delay = max(adaptive_delay * 0.9, batch_delay)
+
             # Skip sleep after the final batch
-            if batch_num < total_batches and BATCH_DELAY_SECONDS > 0:
-                time.sleep(BATCH_DELAY_SECONDS)
+            if batch_num < total_batches and adaptive_delay > 0:
+                time.sleep(adaptive_delay)
     else:
-        total_batches = (len(readings) + BATCH_SIZE - 1) // BATCH_SIZE
+        total_batches = (len(readings) + batch_size - 1) // batch_size
         print(f"\n[7/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
 
     # ------------------------------------------------------------------
@@ -476,6 +584,29 @@ def main():
         action="store_true",
         help="Delete existing demo stations before seeding.",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=BATCH_SIZE,
+        help=f"Ingest batch size (default: {BATCH_SIZE})",
+    )
+    parser.add_argument(
+        "--batch-delay",
+        type=float,
+        default=BATCH_DELAY_SECONDS,
+        help=f"Delay between ingest batches in seconds (default: {BATCH_DELAY_SECONDS})",
+    )
+    parser.add_argument(
+        "--ingest-timeout",
+        type=float,
+        default=DEFAULT_INGEST_TIMEOUT,
+        help=f"HTTP timeout per ingest request in seconds (default: {DEFAULT_INGEST_TIMEOUT})",
+    )
+    parser.add_argument(
+        "--wait-for-backend",
+        action="store_true",
+        help="Poll backend until it responds before starting.",
+    )
     args = parser.parse_args()
 
     summary = run_seed(
@@ -484,6 +615,10 @@ def main():
         cleanup=args.cleanup,
         stations=args.stations,
         days=args.days,
+        batch_size=args.batch_size,
+        batch_delay=args.batch_delay,
+        ingest_timeout=args.ingest_timeout,
+        wait_for_backend=args.wait_for_backend,
     )
 
     if summary.get("api_errors", 0) > 0:

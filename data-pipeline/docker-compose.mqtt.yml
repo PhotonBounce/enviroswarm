@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   mosquitto:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.0.18
     container_name: enviroswarm-mqtt
     ports:
       - "1883:1883"   # MQTT
