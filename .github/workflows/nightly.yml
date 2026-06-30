@@ -1,0 +1,55 @@
+name: Nightly Backup & Health Check
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # 3 AM UTC every day
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Database Backup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H $DEPLOY_HOST >> ~/.ssh/known_hosts
+      - name: Run backup
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh $DEPLOY_USER@$DEPLOY_HOST "cd /opt/enviroswarm && ./scripts/backup.sh"
+      - name: Upload backup artifact (if available locally)
+        run: |
+          echo "Backup completed on remote server. Check /opt/enviroswarm/backups/"
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run health check
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          WEB_URL: ${{ secrets.WEB_URL }}
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK }}
+        run: |
+          curl -sf "$API_URL/api/v1/health" || exit 1
+          curl -sf "$WEB_URL" || exit 1
+          echo "Health check passed"
+      - name: Notify on failure
+        if: failure()
+        env:
+          ALERT_WEBHOOK: ${{ secrets.ALERT_WEBHOOK }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{"text":"ENViroSwarm NIGHTLY HEALTH CHECK FAILED!"}' \
+            "$ALERT_WEBHOOK" || true

@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-release:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Build backend Docker image
+        run: |
+          cd backend
+          docker build -t enviroswarm-backend:${{ steps.get_version.outputs.VERSION }} .
+      - name: Build web assets
+        run: |
+          cd web-dashboard
+          npm ci
+          npm run build
+      - name: Create release tarball
+        run: |
+          tar -czf enviroswarm-${{ steps.get_version.outputs.VERSION }}.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.venv' \
+            --exclude='__pycache__' \
+            .
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: enviroswarm-*.tar.gz
+          generate_release_notes: true
+          body: |
+            ## ENViroSwarm ${{ steps.get_version.outputs.VERSION }}
+            
+            ### What's included
+            - Backend FastAPI application
+            - React web dashboard (built)
+            - React Native Android app
+            - Data pipeline & MQTT tools
+            - Docker Compose production configs
+            - Nginx reverse proxy config
+            - Automated backup & health check scripts
+            
+            ### Quick Start
+            ```bash
+            tar -xzf enviroswarm-${{ steps.get_version.outputs.VERSION }}.tar.gz
+            cd enviroswarm
+            make setup
+            make dev
+            ```
+            
+            ### Deployment
+            See `scripts/deploy.sh` and `docker-compose.prod.yml` for production deployment.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
