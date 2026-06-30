@@ -1,0 +1,49 @@
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { SensorReading, SENSOR_UNITS } from '../types';
+
+interface SensorCardProps {
+  reading: SensorReading;
+}
+
+export function SensorCard({ reading }: SensorCardProps) {
+  const unit = SENSOR_UNITS[reading.sensor_type] || reading.unit;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.type}>{reading.sensor_type.replace('_', ' ').toUpperCase()}</Text>
+      <Text style={styles.value}>
+        {reading.value.toFixed(2)} {unit}
+      </Text>
+      <Text style={styles.timestamp}>{new Date(reading.timestamp).toLocaleString()}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 6,
+    marginHorizontal: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10b981',
+  },
+  type: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  value: {
+    color: '#f1f5f9',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  timestamp: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 4,
+  },
+});
