@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, Bell, User } from 'lucide-react'
+import { Menu, Bell, User, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
@@ -16,7 +16,10 @@ const mobileNavItems = [
 export default function Header() {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const location = useLocation()
+
+  const notificationCount = 0
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
@@ -25,6 +28,7 @@ export default function Header() {
           <button
             className="md:hidden rounded-lg p-2 hover:bg-muted"
             onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label="Toggle mobile menu"
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -33,9 +37,39 @@ export default function Header() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <button className="relative rounded-lg p-2 hover:bg-muted">
-            <Bell className="h-5 w-5 text-muted-foreground" />
-          </button>
+          <div className="relative">
+            <button
+              className="relative rounded-lg p-2 hover:bg-muted"
+              onClick={() => setNotificationsOpen(!notificationsOpen)}
+              aria-label="Notifications"
+              aria-haspopup="true"
+              aria-expanded={notificationsOpen}
+            >
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-72 rounded-lg border border-border bg-card shadow-lg z-50">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <span className="text-sm font-semibold">Notifications</span>
+                  <button
+                    onClick={() => setNotificationsOpen(false)}
+                    className="rounded p-1 hover:bg-muted"
+                    aria-label="Close notifications"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  No new notifications
+                </div>
+              </div>
+            )}
+          </div>
           <Link
             to="/profile"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white text-sm font-semibold"

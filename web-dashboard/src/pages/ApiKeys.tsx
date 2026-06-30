@@ -29,6 +29,10 @@ export default function ApiKeys() {
     if (!keyName.trim()) return
     try {
       const result = await createApiKey.mutateAsync(keyName.trim())
+      // SECURITY NOTE: On creation, the backend returns the raw API key in the
+      // `key_hash` field for one-time display. On listing, `key_hash` is the
+      // actual hash. The naming is misleading — this is a known backend contract
+      // quirk that should be clarified with the API team (raw_key vs key_hash).
       setNewKey(result.key_hash)
       setKeyName('')
     } catch {
@@ -38,7 +42,12 @@ export default function ApiKeys() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to revoke this API key?')) return
-    await deleteApiKey.mutateAsync(id)
+    try {
+      await deleteApiKey.mutateAsync(id)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to revoke API key'
+      alert(message)
+    }
   }
 
   const handleCopy = async (key: string, id: string) => {
@@ -47,7 +56,7 @@ export default function ApiKeys() {
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 2000)
     } catch {
-      // Clipboard permission denied
+      alert('Clipboard access denied. Please copy manually.')
     }
   }
 

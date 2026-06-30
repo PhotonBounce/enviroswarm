@@ -101,6 +101,7 @@ export interface DataQueryParams {
   start?: string
   end?: string
   limit?: number
+  page?: number
   aggregate?: string
 }
 

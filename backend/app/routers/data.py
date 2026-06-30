@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.dependencies import rate_limit_dependency
+from app.dependencies import rate_limit_dependency, require_permission
 from app.models import SensorReading, SensorStation, User
 from app.schemas import (
     StandardResponse,
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/data", tags=["data"])
 @router.get("", response_model=StandardResponse)
 async def query_data(
     station_id: Optional[UUID] = Query(None),
-    sensor_type: Optional[str] = Query(None),
+    sensor_type: Optional[str] = Query(None, pattern="^(air_quality|temperature|humidity|noise_level|radiation|water_quality|co2|pm25|pm10|voc)$"),
     start: Optional[datetime] = Query(None),
     end: Optional[datetime] = Query(None),
     limit: int = Query(100, ge=1, le=10000),
@@ -147,7 +147,13 @@ async def nearby(
 
     # Use a SQL bounding box to avoid loading all stations into memory
     lat_margin = radius_km / 111.0
-    lon_margin = radius_km / (111.32 * math.cos(math.radians(lat)))
+    cos_lat = math.cos(math.radians(lat))
+    # Guard against cos(lat) approaching 0 at the poles
+    if abs(cos_lat) < 1e-6:
+        lon_margin = 180.0
+    else:
+        lon_margin = radius_km / (111.32 * cos_lat)
+    lon_margin = min(lon_margin, 180.0)
 
     stmt = (
         select(SensorStation)

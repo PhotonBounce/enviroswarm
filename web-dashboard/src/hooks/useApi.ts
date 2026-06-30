@@ -116,6 +116,11 @@ export function useCreateStation() {
 }
 
 // Data
+export interface SensorDataResult {
+  readings: SensorReading[]
+  meta?: { page: number; limit: number; total: number }
+}
+
 export function useSensorData(params: DataQueryParams) {
   return useQuery({
     queryKey: ['sensorData', params],
@@ -126,7 +131,7 @@ export function useSensorData(params: DataQueryParams) {
       if (!res.data?.success) {
         throw new Error(res.data?.error || 'Failed to fetch sensor data')
       }
-      return res.data.data
+      return { readings: res.data.data, meta: res.data.meta } as SensorDataResult
     },
   })
 }

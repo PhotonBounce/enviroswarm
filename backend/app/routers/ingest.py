@@ -1,54 +1,20 @@
 """Data ingestion router."""
 
-import asyncio
-import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user_or_api_key, rate_limit_dependency
-from app.models import SensorReading, SensorStation, User
+from app.models import SensorReading, SensorStation, User, IdempotencyKey
 from app.schemas import StandardResponse, IngestRequest, IngestResponse
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
-# ---------------------------------------------------------------------------
-# In-memory idempotency store: { key_hash: (expires_at, result) }
-# Replace with Redis in production.
-# ---------------------------------------------------------------------------
-_idempotency_store: dict = {}
-_idempotency_lock = asyncio.Lock()
-
 _IDEMPOTENCY_TTL = 300  # 5 minutes
-
-
-def _idempotency_key(user_id, key: str) -> str:
-    return hashlib.sha256(f"{user_id}:{key}".encode()).hexdigest()
-
-
-async def _check_idempotency(user_id, key: str):
-    now = datetime.now(timezone.utc)
-    async with _idempotency_lock:
-        # Evict expired entries (simple sweep)
-        expired = [k for k, (expires, _) in _idempotency_store.items() if expires < now]
-        for k in expired:
-            _idempotency_store.pop(k, None)
-        cache_key = _idempotency_key(user_id, key)
-        cached = _idempotency_store.get(cache_key)
-        if cached:
-            return cached[1]
-    return None
-
-
-async def _store_idempotency(user_id, key: str, result):
-    now = datetime.now(timezone.utc)
-    async with _idempotency_lock:
-        cache_key = _idempotency_key(user_id, key)
-        _idempotency_store[cache_key] = (now + timedelta(seconds=_IDEMPOTENCY_TTL), result)
 
 
 @router.post("", response_model=StandardResponse)
@@ -66,12 +32,20 @@ async def ingest(
             detail="API key does not have write permission",
         )
 
-    # Idempotency check
+    # Idempotency check — transactional via DB
     idempotency_key = request.headers.get("X-Idempotency-Key")
     if idempotency_key:
-        cached = await _check_idempotency(str(user.id), idempotency_key)
-        if cached is not None:
-            return StandardResponse(data=cached)
+        key_hash = f"{user.id}:{idempotency_key}"
+        idem_result = await db.execute(
+            select(IdempotencyKey).where(
+                IdempotencyKey.user_id == user.id,
+                IdempotencyKey.key_hash == key_hash,
+                IdempotencyKey.expires_at > datetime.now(timezone.utc),
+            )
+        )
+        cached = idem_result.scalar_one_or_none()
+        if cached:
+            return StandardResponse(data=cached.response)
 
     try:
         # Verify all stations belong to user and are not soft-deleted
@@ -118,13 +92,14 @@ async def ingest(
             select(User).where(User.id == user.id).with_for_update()
         )
 
-        # Check daily reading limit using COUNT()
+        # Check daily reading limit using COUNT() — exclude soft-deleted stations
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         count_result = await db.execute(
             select(func.count(SensorReading.id))
             .join(SensorStation)
             .where(
                 SensorStation.user_id == user.id,
+                SensorStation.deleted_at.is_(None),
                 SensorReading.deleted_at.is_(None),
                 SensorReading.timestamp >= today_start,
             )
@@ -152,13 +127,23 @@ async def ingest(
             )
 
         db.add_all(readings)
+
+        # Store idempotency key as part of the same transaction
+        if idempotency_key:
+            key_hash = f"{user.id}:{idempotency_key}"
+            result_data = IngestResponse(inserted=len(readings)).model_dump(mode="json")
+            db.add(
+                IdempotencyKey(
+                    user_id=user.id,
+                    key_hash=key_hash,
+                    response=result_data,
+                    expires_at=datetime.now(timezone.utc) + timedelta(seconds=_IDEMPOTENCY_TTL),
+                )
+            )
+
         await db.commit()
 
-        result_data = IngestResponse(inserted=len(readings)).model_dump(mode="json")
-        if idempotency_key:
-            await _store_idempotency(str(user.id), idempotency_key, result_data)
-
-        return StandardResponse(data=result_data)
+        return StandardResponse(data=result_data if idempotency_key else IngestResponse(inserted=len(readings)).model_dump(mode="json"))
     except HTTPException:
         await db.rollback()
         raise

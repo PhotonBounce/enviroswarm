@@ -1,25 +1,48 @@
+import { useMemo } from 'react'
 import { Radio, BarChart3, Zap } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { useStations } from '@/hooks/useApi'
-import { capitalize } from '@/lib/utils'
+import { useStations, useSensorData } from '@/hooks/useApi'
+import { capitalize, formatDate } from '@/lib/utils'
 import type { SensorStation } from '@/types'
-
-const stats = [
-  { label: 'Stations', value: '2', icon: Radio, change: '+1 this month' },
-  { label: 'Readings Today', value: '1,248', icon: BarChart3, change: '+12% from yesterday' },
-  { label: 'Active Sensors', value: '8', icon: Zap, change: 'All operational' },
-]
-
-const recentActivity = [
-  { title: 'Station "Park Air" uploaded 45 readings', time: '2 minutes ago', type: 'data' },
-  { title: 'New station "Riverside Monitor" created', time: '1 hour ago', type: 'station' },
-  { title: 'Temperature threshold alert triggered', time: '3 hours ago', type: 'alert' },
-  { title: 'Daily summary report generated', time: '5 hours ago', type: 'report' },
-]
 
 export default function Dashboard() {
   const { data: stations, isLoading, error } = useStations()
+
+  const today = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString()
+  }, [])
+
+  const now = useMemo(() => new Date().toISOString(), [])
+
+  const { data: todayResponse, isLoading: readingsLoading } = useSensorData({
+    start: today,
+    end: now,
+    limit: 1,
+  })
+
+  const stats = useMemo(() => {
+    const stationCount = stations?.length ?? 0
+    const activeSensorCount = stations?.reduce((acc: number, s: SensorStation) => acc + s.sensor_types.length, 0) ?? 0
+    const readingCount = todayResponse?.meta?.total ?? todayResponse?.readings?.length ?? 0
+    return [
+      { label: 'Stations', value: String(stationCount), icon: Radio, change: stationCount === 1 ? '1 station' : `${stationCount} stations` },
+      { label: 'Readings Today', value: String(readingCount), icon: BarChart3, change: readingCount > 0 ? 'Data collected today' : 'No readings yet today' },
+      { label: 'Active Sensors', value: String(activeSensorCount), icon: Zap, change: activeSensorCount > 0 ? 'All operational' : 'No sensors configured' },
+    ]
+  }, [stations, todayResponse])
+
+  const recentActivity = useMemo(() => {
+    if (!stations || stations.length === 0) return []
+    const sorted = [...stations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 4)
+    return sorted.map((station) => ({
+      title: `Station "${station.name}" created`,
+      time: formatDate(station.created_at),
+      type: 'station' as const,
+    }))
+  }, [stations])
 
   return (
     <div className="space-y-6">
@@ -96,17 +119,26 @@ export default function Dashboard() {
             <CardDescription>Latest events from your network</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((item, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.title}</p>
-                    <p className="text-xs text-muted-foreground">{item.time}</p>
+            {readingsLoading ? (
+              <div className="text-center text-muted-foreground py-8">Loading activity...</div>
+            ) : recentActivity.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivity.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">{item.time}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                <p>No recent activity</p>
+                <p className="text-xs">Create a station to see activity here</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

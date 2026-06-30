@@ -19,11 +19,8 @@ export default function Login() {
     setError('')
     try {
       const result = await loginMutation.mutateAsync({ email, password })
-      // Store token BEFORE any authenticated API calls
-      localStorage.setItem('access_token', result.access_token)
-      if (result.refresh_token) {
-        localStorage.setItem('refresh_token', result.refresh_token)
-      }
+      // Store token in sessionStorage so the axios interceptor can use it for /me
+      sessionStorage.setItem('enviroswarm_token', result.access_token)
       // Fetch user after login using the configured axios client
       try {
         const userData = await api.get('/me')

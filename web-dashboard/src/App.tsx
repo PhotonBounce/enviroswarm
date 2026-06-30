@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useMe } from '@/hooks/useApi'
 import Layout from '@/components/layout/Layout'
@@ -13,6 +14,7 @@ import Pricing from '@/pages/Pricing'
 import Profile from '@/pages/Profile'
 
 function App() {
+  const queryClient = useQueryClient()
   const { isAuthenticated, user, setUser } = useAuth()
   const { data: meData } = useMe()
 
@@ -20,7 +22,18 @@ function App() {
     if (meData && !user) {
       setUser(meData)
     }
-  }, [meData, user, setUser])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meData, setUser])
+
+  // Clear the ['me'] query cache when the user is logged out to prevent
+  // stale data from re-populating the user state
+  useEffect(() => {
+    const handler = () => {
+      queryClient.removeQueries({ queryKey: ['me'] })
+    }
+    window.addEventListener('enviroswarm:unauthorized', handler)
+    return () => window.removeEventListener('enviroswarm:unauthorized', handler)
+  }, [queryClient])
 
   return (
     <Routes>

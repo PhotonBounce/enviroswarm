@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, Download } from 'lucide-react'
+import { Search, Download, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -17,24 +17,31 @@ const sensorOptions: SensorType[] = [
   'water_quality', 'co2', 'pm25', 'pm10', 'voc',
 ]
 
+const limitOptions = [10, 25, 50, 100]
+
 export default function DataExplorer() {
   const { data: stations } = useStations()
   const [stationId, setStationId] = useState('')
   const [sensorType, setSensorType] = useState<SensorType | ''>('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(50)
   const [queryParams, setQueryParams] = useState<{
     station_id?: string
     sensor_type?: SensorType
     start?: string
     end?: string
     limit?: number
+    page?: number
   }>({})
 
-  const { data: readings, isLoading } = useSensorData(queryParams)
+  const { data: response, isLoading } = useSensorData(queryParams)
+  const readings = response?.readings ?? []
+  const meta = response?.meta
 
   const handleSearch = () => {
-    const params: typeof queryParams = {}
+    const params: typeof queryParams = { page: 1, limit }
     if (stationId) params.station_id = stationId
     if (sensorType) params.sensor_type = sensorType
     if (start) {
@@ -49,16 +56,27 @@ export default function DataExplorer() {
         params.end = endDate.toISOString()
       }
     }
-    params.limit = 500
+    setPage(1)
     setQueryParams(params)
   }
 
-  const filteredReadings = readings ?? []
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1) return
+    if (meta && newPage > Math.ceil(meta.total / meta.limit)) return
+    setPage(newPage)
+    setQueryParams((prev) => ({ ...prev, page: newPage }))
+  }
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit)
+    setPage(1)
+    setQueryParams((prev) => ({ ...prev, page: 1, limit: newLimit }))
+  }
 
   const handleExportCsv = () => {
-    if (!filteredReadings.length) return
+    if (!readings.length) return
     const headers = ['timestamp', 'station_id', 'sensor_type', 'value', 'unit']
-    const rows = filteredReadings.map((r: SensorReading) => [
+    const rows = readings.map((r: SensorReading) => [
       r.timestamp,
       r.station_id,
       r.sensor_type,
@@ -75,6 +93,7 @@ export default function DataExplorer() {
     URL.revokeObjectURL(url)
   }
 
+  const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
   const stationNameMap = new Map(stations?.map((s) => [s.id, s.name]))
 
   return (
@@ -118,15 +137,23 @@ export default function DataExplorer() {
               <Input type="datetime-local" value={end} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnd(e.target.value)} />
             </div>
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button onClick={handleSearch}>
               <Search className="mr-2 h-4 w-4" />
               Run Query
             </Button>
-            <Button variant="outline" onClick={handleExportCsv} disabled={!filteredReadings.length}>
+            <Button variant="outline" onClick={handleExportCsv} disabled={!readings.length}>
               <Download className="mr-2 h-4 w-4" />
               Export CSV
             </Button>
+            <div className="ml-auto flex items-center gap-2">
+              <label className="text-sm text-muted-foreground">Per page:</label>
+              <Select value={String(limit)} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLimitChange(Number(e.target.value))}>
+                {limitOptions.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -145,7 +172,7 @@ export default function DataExplorer() {
               {isLoading ? (
                 <div className="flex h-64 items-center justify-center text-muted-foreground">Loading data...</div>
               ) : (
-                <SensorChart data={filteredReadings} />
+                <SensorChart data={readings} />
               )}
             </CardContent>
           </Card>
@@ -154,36 +181,65 @@ export default function DataExplorer() {
           <Card>
             <CardHeader>
               <CardTitle>Readings</CardTitle>
-              <CardDescription>{filteredReadings.length} records found</CardDescription>
+              <CardDescription>
+                {meta ? `${meta.total} records found · Page ${meta.page} of ${totalPages}` : `${readings.length} records found`}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="text-center text-muted-foreground py-8">Loading...</div>
-              ) : filteredReadings.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Timestamp</TableHead>
-                      <TableHead>Station</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Value</TableHead>
-                      <TableHead>Unit</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredReadings.slice(0, 50).map((reading: SensorReading) => (
-                      <TableRow key={reading.id}>
-                        <TableCell>{formatDate(reading.timestamp)}</TableCell>
-                        <TableCell>{stationNameMap.get(reading.station_id) || reading.station_id}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{capitalize(reading.sensor_type)}</Badge>
-                        </TableCell>
-                        <TableCell className="font-mono">{reading.value.toFixed(3)}</TableCell>
-                        <TableCell>{reading.unit}</TableCell>
+              ) : readings.length > 0 ? (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Timestamp</TableHead>
+                        <TableHead>Station</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Value</TableHead>
+                        <TableHead>Unit</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {readings.map((reading: SensorReading) => (
+                        <TableRow key={reading.id}>
+                          <TableCell>{formatDate(reading.timestamp)}</TableCell>
+                          <TableCell>{stationNameMap.get(reading.station_id) || reading.station_id}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{capitalize(reading.sensor_type)}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono">{reading.value.toFixed(3)}</TableCell>
+                          <TableCell>{reading.unit}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {meta && totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page - 1)}
+                        disabled={page <= 1}
+                      >
+                        <ChevronLeft className="mr-1 h-4 w-4" />
+                        Previous
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        Page {page} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(page + 1)}
+                        disabled={page >= totalPages}
+                      >
+                        Next
+                        <ChevronRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center text-muted-foreground py-8">No data. Run a query to see results.</div>
               )}

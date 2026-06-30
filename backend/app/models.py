@@ -110,7 +110,7 @@ class SensorReading(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    reading_metadata: Mapped[dict] = mapped_column("metadata", JSON, default_factory=dict)
+    reading_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -133,11 +133,11 @@ class ApiKey(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    key_prefix: Mapped[str] = mapped_column(String(8), nullable=False, index=True)
     key_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     permissions: Mapped[dict] = mapped_column(
-        JSON, default_factory=lambda: {"read": True, "write": False}
+        JSON, default=lambda: {"read": True, "write": False}
     )
     rate_limit_per_min: Mapped[int] = mapped_column(default=60)
     last_used_at: Mapped[Optional[datetime]] = mapped_column(
@@ -185,4 +185,28 @@ class Subscription(Base):
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_sub_tier"),
         CheckConstraint("payment_status IN ('pending', 'active', 'failed', 'cancelled')", name="ck_sub_payment_status"),
+    )
+
+
+class IdempotencyKey(Base):
+    """Transactional idempotency key store."""
+    __tablename__ = "idempotency_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    key_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    response: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (
+        CheckConstraint("expires_at > created_at", name="ck_idempotency_expires_after_created"),
     )

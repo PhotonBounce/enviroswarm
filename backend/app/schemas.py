@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for request/response validation."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -32,14 +32,6 @@ SENSOR_TYPES = [
     "pm10",
     "voc",
 ]
-
-class SensorTypeValidator:
-    @field_validator("sensor_type", mode="before")
-    @classmethod
-    def validate_sensor_type(cls, v: str) -> str:
-        if v not in SENSOR_TYPES:
-            raise ValueError(f"Invalid sensor_type. Must be one of: {SENSOR_TYPES}")
-        return v
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -198,6 +190,17 @@ class ApiKeyCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     permissions: Optional[Dict[str, bool]] = None
     expires_at: Optional[datetime] = None
+
+    @field_validator("expires_at", mode="before")
+    @classmethod
+    def validate_expires_at(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        if v <= datetime.now(timezone.utc):
+            raise ValueError("expires_at must be in the future")
+        return v
 
 class ApiKeyCreateResponse(BaseModel):
     id: UUID

@@ -28,6 +28,11 @@ export default function LoginScreen({ navigation }: Props) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
     setLoading(true);
     try {
       await login(email, password);

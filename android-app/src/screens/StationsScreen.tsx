@@ -15,6 +15,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../api/client';
 import { SensorStation, SensorType, SENSOR_TYPES, ApiResponse } from '../types';
 import { useLocation } from '../hooks/useLocation';
@@ -26,7 +27,6 @@ interface Props {
 
 export default function StationsScreen({ navigation }: Props) {
   const [stations, setStations] = useState<SensorStation[]>([]);
-  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
@@ -35,9 +35,10 @@ export default function StationsScreen({ navigation }: Props) {
   const [lon, setLon] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const { getCurrentLocation } = useLocation();
+  const insets = useSafeAreaInsets();
 
   const fetchStations = async () => {
-    setLoading(true);
+    setRefreshing(true);
     try {
       const res = await apiClient.get<ApiResponse<SensorStation[]>>('/stations');
       if (res.data?.success) {
@@ -46,7 +47,7 @@ export default function StationsScreen({ navigation }: Props) {
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to load stations');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -137,7 +138,10 @@ export default function StationsScreen({ navigation }: Props) {
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={openCreateModal}>
+      <TouchableOpacity
+        style={[styles.fab, { bottom: 20 + insets.bottom }]}
+        onPress={openCreateModal}
+      >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
@@ -247,7 +251,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
     backgroundColor: '#10b981',
     width: 56,
     height: 56,

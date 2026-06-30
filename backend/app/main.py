@@ -1,16 +1,17 @@
 """FastAPI app factory with lifespan, CORS, and middleware."""
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
-from app.database import engine, Base
+from app.database import get_engine, Base
 from app.routers import auth, stations, ingest, data, apikeys, billing
 
 # Configure logging
@@ -23,11 +24,19 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting up ENViroSwarm API...")
-    async with engine.begin() as conn:
+    # NOTE: In production, use Alembic migrations (`alembic upgrade head`)
+    # instead of create_all. create_all does not handle schema migrations,
+    # renames, or data migrations.
+    if settings.is_production:
+        logger.warning(
+            "PRODUCTION WARNING: Base.metadata.create_all is being used. "
+            "Run 'alembic upgrade head' in your Docker entrypoint instead."
+        )
+    async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
     logger.info("Shutting down ENViroSwarm API...")
-    await engine.dispose()
+    await get_engine().dispose()
 
 
 app = FastAPI(
@@ -63,13 +72,32 @@ app.include_router(billing.router, prefix="/api/v1")
 # Health check (must be at /api/v1/health for load balancers)
 @app.get("/api/v1/health", tags=["health"])
 async def health() -> dict:
-    return {"success": True, "data": {"status": "ok", "version": "1.0.0"}}
+    """Return service health status, including a lightweight DB ping."""
+    try:
+        from sqlalchemy import text
+        async with get_engine().connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"success": True, "data": {"status": "ok", "version": "1.0.0"}}
+    except Exception as exc:
+        logger.error("Health check DB ping failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "data": {"status": "unhealthy", "version": "1.0.0"}, "error": "Database unavailable"},
+        )
 
 
 # Global exception handler — never leak internal details in production
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+async def global_exception_handler(request: Request, exc: Exception):
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4())[:8])
+    logger.error(
+        "Unhandled exception: method=%s path=%s request_id=%s exc=%s",
+        request.method,
+        request.url.path,
+        request_id,
+        exc,
+        exc_info=True,
+    )
     if settings.is_production:
         return JSONResponse(
             status_code=500,

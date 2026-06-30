@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.dependencies import require_permission
 from app.models import Subscription, User
 from app.schemas import StandardResponse, PricingTier, SubscriptionRequest, SubscriptionResponse
 
@@ -54,7 +55,7 @@ async def get_pricing() -> StandardResponse:
 @router.post("/subscribe", response_model=StandardResponse)
 async def subscribe(
     body: SubscriptionRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     tier_names = {t.name for t in PRICING_TIERS}

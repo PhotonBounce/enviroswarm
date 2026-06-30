@@ -1,6 +1,5 @@
 """API keys router."""
 
-import hashlib
 import secrets
 from datetime import datetime, timezone
 from uuid import UUID
@@ -11,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.dependencies import require_tier
+from app.dependencies import require_tier, require_permission
 from app.models import ApiKey, User
 from app.schemas import (
     StandardResponse,
@@ -19,12 +18,9 @@ from app.schemas import (
     ApiKeyCreateResponse,
     ApiKeyResponse,
 )
+from app.utils.crypto import hash_key, extract_prefix
 
 router = APIRouter(prefix="/apikeys", tags=["apikeys"])
-
-
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
 
 
 def _generate_api_key() -> str:
@@ -53,8 +49,8 @@ async def create_api_key(
         )
 
     raw_key = _generate_api_key()
-    key_hash = _hash_key(raw_key)
-    key_prefix = raw_key[:8].lower()
+    key_hash = hash_key(raw_key)
+    key_prefix = extract_prefix(raw_key)
 
     api_key = ApiKey(
         user_id=user.id,
@@ -84,7 +80,7 @@ async def create_api_key(
 
 @router.get("", response_model=StandardResponse)
 async def list_api_keys(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -99,7 +95,7 @@ async def list_api_keys(
 @router.delete("/{key_id}", response_model=StandardResponse)
 async def revoke_api_key(
     key_id: UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(

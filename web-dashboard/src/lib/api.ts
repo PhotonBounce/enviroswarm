@@ -24,8 +24,8 @@ const api = axios.create({
 // The backend must support cookie-based auth for a true httpOnly solution.
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('enviroswarm_token')
-    if (token && config.headers) {
+    const token = sessionStorage.getItem('enviroswarm_token')
+    if (token && config.headers && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
@@ -39,15 +39,14 @@ api.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('enviroswarm_token')
+      sessionStorage.removeItem('enviroswarm_token')
       if (!isRedirecting) {
         isRedirecting = true
         // Emit a custom event so the SPA can handle navigation without a full reload
         window.dispatchEvent(new CustomEvent('enviroswarm:unauthorized'))
-        // Fallback: still redirect if nothing listens, but debounce to avoid loops
+        // Reset flag after a short delay to allow future re-auth attempts
         setTimeout(() => {
           isRedirecting = false
-          window.location.href = '/login'
         }, 100)
       }
     }

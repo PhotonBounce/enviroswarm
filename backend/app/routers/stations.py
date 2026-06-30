@@ -2,13 +2,14 @@ from uuid import UUID
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models import SensorStation, User
+from app.dependencies import require_permission
+from app.models import SensorStation, SensorReading, User
 from app.schemas import StandardResponse, StationCreateRequest, StationUpdateRequest, StationResponse
 
 router = APIRouter(prefix="/stations", tags=["stations"])
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 @router.post("", response_model=StandardResponse)
 async def create_station(
     body: StationCreateRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Tier limits — lock user row to prevent race condition
@@ -61,11 +62,11 @@ async def create_station(
 
 @router.get("", response_model=StandardResponse)
 async def list_stations(
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    status_filter: Optional[str] = Query(None, alias="status"),
+    status_filter: Optional[str] = Query(None, alias="status", pattern="^(active|inactive|maintenance)$"),
 ) -> StandardResponse:
     stmt = select(SensorStation).where(
         SensorStation.user_id == user.id, SensorStation.deleted_at.is_(None)
@@ -89,7 +90,7 @@ async def list_stations(
 @router.get("/{station_id}", response_model=StandardResponse)
 async def get_station(
     station_id: UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -113,7 +114,7 @@ async def get_station(
 async def update_station(
     station_id: UUID,
     body: StationUpdateRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -149,7 +150,7 @@ async def update_station(
 @router.delete("/{station_id}", response_model=StandardResponse)
 async def delete_station(
     station_id: UUID,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -164,6 +165,13 @@ async def delete_station(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
-    station.deleted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    station.deleted_at = now
+    # Cascade soft-delete to readings
+    await db.execute(
+        update(SensorReading)
+        .where(SensorReading.station_id == station.id, SensorReading.deleted_at.is_(None))
+        .values(deleted_at=now)
+    )
     await db.commit()
     return StandardResponse(data={"deleted": str(station_id)})

@@ -1,6 +1,7 @@
 """JWT utilities, password hashing, and current-user dependency."""
 
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -65,7 +66,7 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
         "iat": now,
         "exp": now + expires_delta,
         "type": "access",
-        "jti": bcrypt.gensalt(rounds=5).decode("utf-8"),  # unique token ID for revocation
+        "jti": secrets.token_urlsafe(16),  # unique token ID for revocation
     }
     token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     return token
@@ -78,13 +79,13 @@ def create_refresh_token(user_id: str) -> str:
         "iat": now,
         "exp": now + timedelta(days=settings.refresh_token_expire_days),
         "type": "refresh",
-        "jti": bcrypt.gensalt(rounds=5).decode("utf-8"),
+        "jti": secrets.token_urlsafe(16),
     }
     token = jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
     return token
 
 
-def decode_token(token: str, expected_type: str) -> dict:
+def _decode_token(token: str, expected_type: str) -> dict:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except jwt.ExpiredSignatureError:
@@ -110,20 +111,18 @@ def decode_token(token: str, expected_type: str) -> dict:
 
 
 def decode_access_token(token: str) -> dict:
-    return decode_token(token, "access")
+    return _decode_token(token, "access")
 
 
 def decode_refresh_token(token: str) -> dict:
-    return decode_token(token, "refresh")
+    return _decode_token(token, "refresh")
 
 
 # ---------------------------------------------------------------------------
 # Current user dependency
 # ---------------------------------------------------------------------------
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
-) -> User:
+async def _get_user_from_token(token: str, db: AsyncSession) -> User:
     payload = decode_access_token(token)
     user_id: Optional[str] = payload.get("sub")
     if user_id is None:
@@ -140,11 +139,17 @@ async def get_current_user(
     return user
 
 
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
+) -> User:
+    return await _get_user_from_token(token, db)
+
+
 async def get_current_user_optional(
     token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)
 ) -> Optional[User]:
     """Return user or None if auth fails. Useful for public endpoints with optional auth."""
     try:
-        return await get_current_user(token, db)
+        return await _get_user_from_token(token, db)
     except HTTPException:
         return None

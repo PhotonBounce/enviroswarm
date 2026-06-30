@@ -29,6 +29,22 @@ export default function RegisterScreen({ navigation }: Props) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters long');
+      return;
+    }
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasLowercase = /[a-z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      Alert.alert('Error', 'Password must contain at least one uppercase letter, one lowercase letter, and one number');
+      return;
+    }
     if (password !== confirm) {
       Alert.alert('Error', 'Passwords do not match');
       return;

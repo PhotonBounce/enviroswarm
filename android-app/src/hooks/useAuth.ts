@@ -24,6 +24,7 @@ export function useAuth() {
         setUser(null);
       }
     } catch (err: any) {
+      console.error('Auth check failed:', err?.message || err);
       await SecureStore.deleteItemAsync('access_token');
       setUser(null);
     } finally {

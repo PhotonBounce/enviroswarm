@@ -7,7 +7,6 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from app.config import get_settings
 from app.database import Base
-from app.models import User, SensorStation, SensorReading, ApiKey, Subscription
 
 settings = get_settings()
 config = context.config

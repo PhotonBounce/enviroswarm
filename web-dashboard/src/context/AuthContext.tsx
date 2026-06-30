@@ -29,15 +29,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('enviroswarm_token')
-    const storedUser = localStorage.getItem('enviroswarm_user')
+    const storedToken = sessionStorage.getItem('enviroswarm_token')
+    const storedUser = sessionStorage.getItem('enviroswarm_user')
     if (storedToken && storedUser) {
       try {
         setToken(storedToken)
         setUserState(JSON.parse(storedUser))
       } catch {
-        localStorage.removeItem('enviroswarm_token')
-        localStorage.removeItem('enviroswarm_user')
+        sessionStorage.removeItem('enviroswarm_token')
+        sessionStorage.removeItem('enviroswarm_user')
       }
     }
     setIsLoading(false)
@@ -46,8 +46,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen for unauthorized events from the API interceptor
   useEffect(() => {
     const handler = () => {
-      localStorage.removeItem('enviroswarm_token')
-      localStorage.removeItem('enviroswarm_user')
+      sessionStorage.removeItem('enviroswarm_token')
+      sessionStorage.removeItem('enviroswarm_user')
       setToken(null)
       setUserState(null)
     }
@@ -56,22 +56,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [])
 
   const login = useCallback((newToken: string, newUser: User) => {
-    // SECURITY NOTE: localStorage is vulnerable to XSS. Consider migrating to httpOnly cookies.
-    localStorage.setItem('enviroswarm_token', newToken)
-    localStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
+    // SECURITY NOTE: sessionStorage reduces XSS persistence compared to localStorage.
+    // For full protection, migrate to httpOnly secure cookies backed by the server.
+    sessionStorage.setItem('enviroswarm_token', newToken)
+    sessionStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
     setToken(newToken)
     setUserState(newUser)
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('enviroswarm_token')
-    localStorage.removeItem('enviroswarm_user')
+    sessionStorage.removeItem('enviroswarm_token')
+    sessionStorage.removeItem('enviroswarm_user')
     setToken(null)
     setUserState(null)
   }, [])
 
   const setUser = useCallback((newUser: User) => {
-    localStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
+    sessionStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
     setUserState(newUser)
   }, [])
 

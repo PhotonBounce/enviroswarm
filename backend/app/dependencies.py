@@ -1,9 +1,6 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
 import asyncio
-import hashlib
-import hmac
-import secrets
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -13,9 +10,10 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db, AsyncSessionLocal
+from app.database import get_db, get_sessionmaker
 from app.models import ApiKey, User
-from app.auth import decode_access_token, get_current_user
+from app.auth import decode_access_token
+from app.utils.crypto import hash_key, extract_prefix
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -33,9 +31,25 @@ RATE_LIMITS = {
     "enterprise": 1000,
 }
 
+_MAX_RATE_LIMIT_ENTRIES = 100_000
+
 
 def _get_rate_limit_key(identifier: str, route: str) -> str:
     return f"{identifier}:{route}"
+
+
+def _evict_rate_limit_entries(now: int) -> None:
+    """Evict expired entries and enforce max size via LRU."""
+    window = 60
+    expired = [k for k, (count, window_start) in _rate_limit_store.items() if now - window_start >= window]
+    for k in expired:
+        _rate_limit_store.pop(k, None)
+    # If still too large, evict oldest entries (by window_start)
+    if len(_rate_limit_store) > _MAX_RATE_LIMIT_ENTRIES:
+        sorted_items = sorted(_rate_limit_store.items(), key=lambda x: x[1][1])
+        to_evict = len(_rate_limit_store) - _MAX_RATE_LIMIT_ENTRIES
+        for k, _ in sorted_items[:to_evict]:
+            _rate_limit_store.pop(k, None)
 
 
 async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
@@ -45,6 +59,7 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
     window = 60  # 1 minute
 
     async with _rate_limit_lock:
+        _evict_rate_limit_entries(now)
         count, window_start = _rate_limit_store.get(key, (0, now))
         if now - window_start >= window:
             # new window
@@ -75,19 +90,6 @@ def extract_api_key(request: Request, x_api_key: Optional[str] = Header(None)) -
 
 
 # ---------------------------------------------------------------------------
-# API key hashing
-# ---------------------------------------------------------------------------
-
-def _hash_key(raw_key: str) -> str:
-    return hashlib.sha256(raw_key.encode()).hexdigest()
-
-
-def _extract_prefix(raw_key: str) -> str:
-    """First 8 chars of the key as prefix for fast lookup."""
-    return raw_key[:8].lower()
-
-
-# ---------------------------------------------------------------------------
 # API key auth dependency
 # ---------------------------------------------------------------------------
 
@@ -101,8 +103,8 @@ async def get_current_user_or_api_key(
     """
     api_key_val = extract_api_key(request, x_api_key)
     if api_key_val:
-        prefix = _extract_prefix(api_key_val)
-        key_hash = _hash_key(api_key_val)
+        prefix = extract_prefix(api_key_val)
+        key_hash = hash_key(api_key_val)
         # O(1) lookup by prefix, then O(1) hash verification
         result = await db.execute(
             select(ApiKey).where(
@@ -118,7 +120,7 @@ async def get_current_user_or_api_key(
                         status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
                     )
                 # Update last_used_at in a separate session to avoid committing shared session
-                async with AsyncSessionLocal() as session:
+                async with get_sessionmaker()() as session:
                     await session.execute(
                         update(ApiKey)
                         .where(ApiKey.id == api_key.id)
@@ -194,6 +196,28 @@ async def rate_limit_dependency(
             detail="Rate limit exceeded",
         )
     return user
+
+
+# ---------------------------------------------------------------------------
+# Permission checking
+# ---------------------------------------------------------------------------
+
+def require_permission(*allowed_permissions: str):
+    """Dependency factory that raises 403 if the API key lacks any of the allowed permissions.
+
+    JWT-authenticated users (no api_key in request.state) are always permitted.
+    """
+    async def checker(request: Request, user: User = Depends(get_current_user_or_api_key)) -> User:
+        api_key = getattr(request.state, "api_key", None)
+        if api_key:
+            perms = api_key.permissions or {}
+            if not any(perms.get(p, False) for p in allowed_permissions):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"API key lacks required permission: {', '.join(allowed_permissions)}",
+                )
+        return user
+    return checker
 
 
 # ---------------------------------------------------------------------------
