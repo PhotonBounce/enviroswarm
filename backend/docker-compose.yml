@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: enviroswarm-db
+    environment:
+      POSTGRES_USER: enviroswarm
+      POSTGRES_PASSWORD: enviroswarm
+      POSTGRES_DB: enviroswarm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enviroswarm -d enviroswarm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: enviroswarm-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://enviroswarm:enviroswarm@db:5432/enviroswarm
+      SECRET_KEY: super-secret-key-for-docker-env
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8081
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:
