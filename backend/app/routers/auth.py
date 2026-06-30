@@ -19,6 +19,7 @@ from app.schemas import (
     StandardResponse,
     UserRegisterRequest,
     UserLoginRequest,
+    RefreshTokenRequest,
     TokenResponse,
     UserResponse,
 )
@@ -32,7 +33,9 @@ async def register(
     body: UserRegisterRequest, db: AsyncSession = Depends(get_db)
 ) -> StandardResponse:
     # Check duplicate email
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(
+        select(User).where(User.email == body.email, User.deleted_at.is_(None))
+    )
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
@@ -63,13 +66,19 @@ async def login(
 ) -> StandardResponse:
     # Basic brute-force protection: limit login attempts per email
     login_key = f"login:{body.email}"
-    if not check_rate_limit(login_key, "/auth/login", 5):
+    if not await check_rate_limit(login_key, "/auth/login", 5):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Try again later.",
         )
 
-    result = await db.execute(select(User).where(User.email == body.email))
+    result = await db.execute(
+        select(User).where(
+            User.email == body.email,
+            User.is_active == True,
+            User.deleted_at.is_(None),
+        )
+    )
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(
@@ -88,15 +97,21 @@ async def login(
 
 @router.post("/refresh", response_model=StandardResponse)
 async def refresh_token(
-    refresh_token: str, db: AsyncSession = Depends(get_db)
+    body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
 ) -> StandardResponse:
-    payload = decode_refresh_token(refresh_token)
+    payload = decode_refresh_token(body.refresh_token)
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
+    result = await db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active == True,
+            User.deleted_at.is_(None),
+        )
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(

@@ -24,7 +24,7 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
@@ -45,13 +45,13 @@ class User(Base):
     )
 
     stations: Mapped[List["SensorStation"]] = relationship(
-        "SensorStation", back_populates="owner", lazy="selectin"
+        "SensorStation", back_populates="owner", lazy="select"
     )
     api_keys: Mapped[List["ApiKey"]] = relationship(
-        "ApiKey", back_populates="owner", lazy="selectin"
+        "ApiKey", back_populates="owner", lazy="select"
     )
     subscriptions: Mapped[List["Subscription"]] = relationship(
-        "Subscription", back_populates="owner", lazy="selectin"
+        "Subscription", back_populates="owner", lazy="select"
     )
 
     __table_args__ = (
@@ -62,10 +62,10 @@ class User(Base):
 class SensorStation(Base):
     __tablename__ = "sensor_stations"
 
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -85,7 +85,7 @@ class SensorStation(Base):
 
     owner: Mapped[User] = relationship("User", back_populates="stations")
     readings: Mapped[List["SensorReading"]] = relationship(
-        "SensorReading", back_populates="station", lazy="selectin", cascade="all, delete-orphan"
+        "SensorReading", back_populates="station", lazy="select", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -96,10 +96,10 @@ class SensorStation(Base):
 class SensorReading(Base):
     __tablename__ = "sensor_readings"
 
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    station_id: Mapped[str] = mapped_column(
+    station_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("sensor_stations.id", ondelete="CASCADE"),
         nullable=False,
@@ -108,7 +108,7 @@ class SensorReading(Base):
     value: Mapped[float] = mapped_column(Numeric(15, 6), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.now(timezone.utc)
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     reading_metadata: Mapped[dict] = mapped_column("metadata", JSON, default_factory=dict)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(
@@ -127,10 +127,10 @@ class SensorReading(Base):
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
@@ -163,10 +163,10 @@ class ApiKey(Base):
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
-    id: Mapped[str] = mapped_column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[str] = mapped_column(
+    user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     tier: Mapped[str] = mapped_column(String(20), nullable=False)

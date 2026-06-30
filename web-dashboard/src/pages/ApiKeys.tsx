@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Key, Plus, Copy, Trash2, AlertTriangle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Key, Plus, Copy, Trash2, AlertTriangle, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -12,12 +13,14 @@ import { formatDate } from '@/lib/utils'
 
 export default function ApiKeys() {
   const { tier } = useAuth()
+  const navigate = useNavigate()
   const { data: apiKeys, isLoading } = useApiKeys()
   const createApiKey = useCreateApiKey()
   const deleteApiKey = useDeleteApiKey()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [keyName, setKeyName] = useState('')
   const [newKey, setNewKey] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const canManageKeys = tier === 'pro' || tier === 'enterprise'
 
@@ -38,8 +41,14 @@ export default function ApiKeys() {
     await deleteApiKey.mutateAsync(id)
   }
 
-  const handleCopy = (key: string) => {
-    navigator.clipboard.writeText(key)
+  const handleCopy = async (key: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(key)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch {
+      // Clipboard permission denied
+    }
   }
 
   if (!canManageKeys) {
@@ -56,7 +65,7 @@ export default function ApiKeys() {
             <p className="text-sm text-muted-foreground text-center max-w-md mt-2">
               API key management is available on Pro and Enterprise tiers. Upgrade to generate and manage API keys for programmatic access to your data.
             </p>
-            <Button className="mt-6" onClick={() => window.location.href = '/pricing'}>
+            <Button className="mt-6" onClick={() => navigate('/pricing')}>
               View Pricing
             </Button>
           </CardContent>
@@ -92,7 +101,7 @@ export default function ApiKeys() {
                     <Badge variant="outline">{key.rate_limit_per_min}/min</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">
-                    {key.key_hash.substring(0, 8)}...{key.key_hash.substring(key.key_hash.length - 8)}
+                    {key.key_hash?.substring(0, 8) ?? ''}...{key.key_hash?.substring(key.key_hash.length - 8) ?? ''}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Created {formatDate(key.created_at)}
@@ -100,8 +109,8 @@ export default function ApiKeys() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleCopy(key.key_hash)}>
-                    <Copy className="h-4 w-4" />
+                  <Button variant="ghost" size="icon" onClick={() => handleCopy(key.key_hash, key.id)}>
+                    {copiedId === key.id ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => handleDelete(key.id)}>
                     <Trash2 className="h-4 w-4 text-red-400" />
@@ -137,7 +146,7 @@ export default function ApiKeys() {
                 </p>
               </div>
               <DialogFooter>
-                <Button onClick={() => handleCopy(newKey)}>
+                <Button onClick={() => handleCopy(newKey, 'new')}>
                   <Copy className="mr-2 h-4 w-4" />
                   Copy to Clipboard
                 </Button>

@@ -1,7 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-const BASE_URL = process.env.API_URL || 'http://localhost:8000';
+// Use Expo public env var for production builds
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.enviroswarm.example.com';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${BASE_URL}/api/v1`,
@@ -11,6 +12,18 @@ export const apiClient: AxiosInstance = axios.create({
     Accept: 'application/json',
   },
 });
+
+// Simple event emitter for auth state changes
+const authListeners = new Set<() => void>();
+export const authEvents = {
+  onUnauthorized: (cb: () => void) => {
+    authListeners.add(cb);
+    return () => authListeners.delete(cb);
+  },
+  emitUnauthorized: () => {
+    authListeners.forEach((cb) => cb());
+  },
+};
 
 apiClient.interceptors.request.use(
   async (config) => {
@@ -28,6 +41,7 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
       await SecureStore.deleteItemAsync('access_token');
+      authEvents.emitUnauthorized();
     }
     return Promise.reject(error);
   }

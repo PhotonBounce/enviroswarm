@@ -1,7 +1,7 @@
 """Tests for auth endpoints."""
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
@@ -12,7 +12,7 @@ from app.auth import hash_password
 
 @pytest.fixture(scope="module")
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -29,7 +29,7 @@ async def test_register_and_login(client: AsyncClient):
     # Register
     r = await client.post("/api/v1/auth/register", json={
         "email": "test@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     assert r.status_code == 200
     data = r.json()
@@ -39,7 +39,7 @@ async def test_register_and_login(client: AsyncClient):
     # Login
     r = await client.post("/api/v1/auth/login", json={
         "email": "test@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     assert r.status_code == 200
     data = r.json()
@@ -52,12 +52,12 @@ async def test_me_endpoint(client: AsyncClient):
     # Register
     await client.post("/api/v1/auth/register", json={
         "email": "me@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     # Login
     r = await client.post("/api/v1/auth/login", json={
         "email": "me@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     token = r.json()["data"]["access_token"]
 

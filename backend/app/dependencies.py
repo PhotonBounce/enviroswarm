@@ -1,5 +1,6 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
+import asyncio
 import hashlib
 import hmac
 import secrets
@@ -9,10 +10,10 @@ from typing import Optional
 
 from fastapi import Depends, HTTPException, Header, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_db, AsyncSessionLocal
 from app.models import ApiKey, User
 from app.auth import decode_access_token, get_current_user
 
@@ -24,6 +25,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 # ---------------------------------------------------------------------------
 
 _rate_limit_store: dict = {}
+_rate_limit_lock = asyncio.Lock()
 
 RATE_LIMITS = {
     "free": 10,
@@ -36,23 +38,24 @@ def _get_rate_limit_key(identifier: str, route: str) -> str:
     return f"{identifier}:{route}"
 
 
-def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
+async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
     """Return True if request is allowed, False if rate-limited."""
     key = _get_rate_limit_key(identifier, route)
     now = int(time.time())
     window = 60  # 1 minute
 
-    count, window_start = _rate_limit_store.get(key, (0, now))
-    if now - window_start >= window:
-        # new window
-        _rate_limit_store[key] = (1, now)
+    async with _rate_limit_lock:
+        count, window_start = _rate_limit_store.get(key, (0, now))
+        if now - window_start >= window:
+            # new window
+            _rate_limit_store[key] = (1, now)
+            return True
+
+        if count >= limit:
+            return False
+
+        _rate_limit_store[key] = (count + 1, window_start)
         return True
-
-    if count >= limit:
-        return False
-
-    _rate_limit_store[key] = (count + 1, window_start)
-    return True
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +94,6 @@ def _extract_prefix(raw_key: str) -> str:
 async def get_current_user_or_api_key(
     request: Request,
     x_api_key: Optional[str] = Header(None),
-    authorization: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Authenticate via API key (x-api-key header or Bearer token that looks like an API key)
@@ -115,11 +117,20 @@ async def get_current_user_or_api_key(
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
                     )
-                # Update last_used_at
-                api_key.last_used_at = datetime.now(timezone.utc)
-                await db.commit()
+                # Update last_used_at in a separate session to avoid committing shared session
+                async with AsyncSessionLocal() as session:
+                    await session.execute(
+                        update(ApiKey)
+                        .where(ApiKey.id == api_key.id)
+                        .values(last_used_at=datetime.now(timezone.utc))
+                    )
+                    await session.commit()
                 user_result = await db.execute(
-                    select(User).where(User.id == api_key.user_id, User.is_active == True)
+                    select(User).where(
+                        User.id == api_key.user_id,
+                        User.is_active == True,
+                        User.deleted_at.is_(None),
+                    )
                 )
                 user = user_result.scalar_one_or_none()
                 if user is None:
@@ -134,7 +145,7 @@ async def get_current_user_or_api_key(
         )
 
     # Fall back to JWT
-    auth = authorization or request.headers.get("Authorization", "")
+    auth = request.headers.get("Authorization", "")
     if not auth or not auth.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication"
@@ -146,7 +157,13 @@ async def get_current_user_or_api_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
+    result = await db.execute(
+        select(User).where(
+            User.id == user_id,
+            User.is_active == True,
+            User.deleted_at.is_(None),
+        )
+    )
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
@@ -171,7 +188,7 @@ async def rate_limit_dependency(
         limit = api_key.rate_limit_per_min
 
     identifier = str(user.id)
-    if not check_rate_limit(identifier, route, limit):
+    if not await check_rate_limit(identifier, route, limit):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded",
@@ -184,7 +201,7 @@ async def rate_limit_dependency(
 # ---------------------------------------------------------------------------
 
 def require_tier(*allowed_tiers: str):
-    async def checker(user: User = Depends(get_current_user)) -> User:
+    async def checker(user: User = Depends(get_current_user_or_api_key)) -> User:
         if user.tier not in allowed_tiers:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

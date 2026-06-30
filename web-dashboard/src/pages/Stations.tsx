@@ -15,7 +15,7 @@ const sensorOptions: SensorType[] = [
 ]
 
 export default function Stations() {
-  const { data: stations, isLoading } = useStations()
+  const { data: stations, isLoading, error } = useStations()
   const createStation = useCreateStation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
@@ -37,11 +37,17 @@ export default function Stations() {
       setFormError('All fields are required')
       return
     }
+    const latNum = parseFloat(latitude)
+    const lonNum = parseFloat(longitude)
+    if (isNaN(latNum) || isNaN(lonNum)) {
+      setFormError('Latitude and longitude must be valid numbers')
+      return
+    }
     try {
       await createStation.mutateAsync({
         name: name.trim(),
-        latitude: parseFloat(latitude),
-        longitude: parseFloat(longitude),
+        latitude: latNum,
+        longitude: lonNum,
         sensor_types: selectedSensors,
       })
       setName('')
@@ -70,6 +76,11 @@ export default function Stations() {
 
       {isLoading ? (
         <div className="text-center text-muted-foreground py-12">Loading stations...</div>
+      ) : error ? (
+        <div className="text-center text-red-400 py-12">
+          <p>Failed to load stations</p>
+          <p className="text-xs">{error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
       ) : stations && stations.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {stations.map((station: SensorStation) => (

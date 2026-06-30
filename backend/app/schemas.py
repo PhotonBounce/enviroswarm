@@ -53,6 +53,9 @@ class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
@@ -73,6 +76,33 @@ class UserResponse(BaseModel):
 # Sensor Stations
 # ---------------------------------------------------------------------------
 
+class StationUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    sensor_types: Optional[List[str]] = Field(None, min_length=1)
+    status: Optional[str] = None
+
+    @field_validator("sensor_types", mode="before")
+    @classmethod
+    def validate_sensor_types(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        invalid = [t for t in v if t not in SENSOR_TYPES]
+        if invalid:
+            raise ValueError(f"Invalid sensor types: {invalid}. Must be one of: {SENSOR_TYPES}")
+        return v
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in {"active", "inactive", "maintenance"}:
+            raise ValueError(f"Invalid status: {v}. Must be one of: active, inactive, maintenance")
+        return v
+
+
 class StationCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     latitude: Optional[float] = Field(None, ge=-90, le=90)
@@ -86,6 +116,13 @@ class StationCreateRequest(BaseModel):
         invalid = [t for t in v if t not in SENSOR_TYPES]
         if invalid:
             raise ValueError(f"Invalid sensor types: {invalid}. Must be one of: {SENSOR_TYPES}")
+        return v
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in {"active", "inactive", "maintenance"}:
+            raise ValueError(f"Invalid status: {v}. Must be one of: active, inactive, maintenance")
         return v
 
 class StationResponse(BaseModel):
@@ -121,7 +158,7 @@ class SensorReadingPayload(BaseModel):
         return v
 
 class IngestRequest(BaseModel):
-    readings: List[SensorReadingPayload] = Field(..., min_length=1)
+    readings: List[SensorReadingPayload] = Field(..., min_length=1, max_length=1000)
 
 class IngestResponse(BaseModel):
     inserted: int

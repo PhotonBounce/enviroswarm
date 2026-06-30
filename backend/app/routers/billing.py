@@ -57,13 +57,29 @@ async def subscribe(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    tier_names = [t.name for t in PRICING_TIERS]
+    tier_names = {t.name for t in PRICING_TIERS}
     if body.tier not in tier_names:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier"
         )
 
-    start_date = datetime.now(timezone.utc)
+    # Check for existing active subscription
+    now = datetime.now(timezone.utc)
+    existing_result = await db.execute(
+        select(Subscription).where(
+            Subscription.user_id == user.id,
+            Subscription.deleted_at.is_(None),
+            Subscription.end_date >= now,
+        )
+    )
+    existing_sub = existing_result.scalar_one_or_none()
+    if existing_sub:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User already has an active subscription",
+        )
+
+    start_date = now
     end_date = start_date + timedelta(days=30 * body.duration_months)
 
     sub = Subscription(
@@ -77,8 +93,15 @@ async def subscribe(
 
     # Update user tier
     user.tier = body.tier
-    await db.commit()
-    await db.refresh(sub)
+    try:
+        await db.commit()
+        await db.refresh(sub)
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create subscription",
+        )
 
     return StandardResponse(
         data=SubscriptionResponse.model_validate(sub).model_dump(mode="json")

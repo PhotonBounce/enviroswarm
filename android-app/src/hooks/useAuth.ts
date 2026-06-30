@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { apiClient } from '../api/client';
+import { apiClient, authEvents } from '../api/client';
 import { User, AuthTokens, ApiResponse } from '../types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const isLoggingIn = useRef(false);
 
   const checkAuth = useCallback(async () => {
     try {
@@ -16,13 +17,13 @@ export function useAuth() {
         return;
       }
       const res = await apiClient.get<ApiResponse<User>>('/me');
-      if (res.data.success) {
+      if (res.data?.success) {
         setUser(res.data.data);
       } else {
         await SecureStore.deleteItemAsync('access_token');
         setUser(null);
       }
-    } catch {
+    } catch (err: any) {
       await SecureStore.deleteItemAsync('access_token');
       setUser(null);
     } finally {
@@ -34,28 +35,56 @@ export function useAuth() {
     checkAuth();
   }, [checkAuth]);
 
-  const login = async (email: string, password: string): Promise<void> => {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>('/auth/login', {
-      email,
-      password,
+  // Listen for 401 events from the API interceptor
+  useEffect(() => {
+    const unsubscribe = authEvents.onUnauthorized(() => {
+      setUser(null);
     });
-    if (!res.data.success) {
-      throw new Error(res.data.error || 'Login failed');
+    return unsubscribe;
+  }, []);
+
+  const login = async (email: string, password: string): Promise<void> => {
+    if (isLoggingIn.current) return;
+    isLoggingIn.current = true;
+    try {
+      const res = await apiClient.post<ApiResponse<AuthTokens>>('/auth/login', {
+        email,
+        password,
+      });
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Login failed');
+      }
+      try {
+        await SecureStore.setItemAsync('access_token', res.data.data.access_token);
+      } catch (storeErr) {
+        throw new Error('Failed to save session. Please check device storage.');
+      }
+      await checkAuth();
+    } finally {
+      isLoggingIn.current = false;
     }
-    await SecureStore.setItemAsync('access_token', res.data.data.access_token);
-    await checkAuth();
   };
 
   const register = async (email: string, password: string): Promise<void> => {
-    const res = await apiClient.post<ApiResponse<AuthTokens>>('/auth/register', {
-      email,
-      password,
-    });
-    if (!res.data.success) {
-      throw new Error(res.data.error || 'Registration failed');
+    if (isLoggingIn.current) return;
+    isLoggingIn.current = true;
+    try {
+      const res = await apiClient.post<ApiResponse<AuthTokens>>('/auth/register', {
+        email,
+        password,
+      });
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Registration failed');
+      }
+      try {
+        await SecureStore.setItemAsync('access_token', res.data.data.access_token);
+      } catch (storeErr) {
+        throw new Error('Failed to save session. Please check device storage.');
+      }
+      await checkAuth();
+    } finally {
+      isLoggingIn.current = false;
     }
-    await SecureStore.setItemAsync('access_token', res.data.data.access_token);
-    await checkAuth();
   };
 
   const logout = async (): Promise<void> => {

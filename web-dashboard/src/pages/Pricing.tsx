@@ -5,11 +5,14 @@ import { Badge } from '@/components/ui/Badge'
 import { usePricing, useSubscribe } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
 
 export default function Pricing() {
   const { data: pricingTiers } = usePricing()
   const subscribe = useSubscribe()
   const { tier } = useAuth()
+  const [pendingTier, setPendingTier] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const tiers = pricingTiers ?? [
     {
@@ -36,11 +39,16 @@ export default function Pricing() {
   ]
 
   const handleSubscribe = async (targetTier: string) => {
+    setPendingTier(targetTier)
+    setToast(null)
     try {
       await subscribe.mutateAsync(targetTier)
-      alert('Subscription updated! (Mock checkout for MVP)')
-    } catch {
-      alert('Subscription failed. Please try again.')
+      setToast({ type: 'success', message: 'Subscription updated! (Mock checkout for MVP)' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Subscription failed. Please try again.'
+      setToast({ type: 'error', message })
+    } finally {
+      setPendingTier(null)
     }
   }
 
@@ -51,9 +59,16 @@ export default function Pricing() {
         <p className="text-muted-foreground">Choose the plan that fits your monitoring needs</p>
       </div>
 
+      {toast && (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
+          {toast.message}
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-3">
         {tiers.map((t: typeof tiers[0]) => {
           const isCurrent = tier === t.tier
+          const isPending = pendingTier === t.tier
           return (
             <Card
               key={t.tier}
@@ -91,10 +106,10 @@ export default function Pricing() {
                   <Button
                     className="w-full"
                     variant={isCurrent ? 'outline' : t.tier === 'pro' ? 'default' : 'outline'}
-                    disabled={isCurrent || subscribe.isPending}
+                    disabled={isCurrent || isPending}
                     onClick={() => handleSubscribe(t.tier)}
                   >
-                    {isCurrent ? 'Current Plan' : 'Subscribe'}
+                    {isCurrent ? 'Current Plan' : isPending ? 'Processing...' : 'Subscribe'}
                   </Button>
                 </div>
               </CardContent>

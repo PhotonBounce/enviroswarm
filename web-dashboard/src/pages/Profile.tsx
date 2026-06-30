@@ -1,21 +1,48 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { User, Mail, Shield, CreditCard } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import { useAuth } from '@/hooks/useAuth'
+import { useUpdateUser } from '@/hooks/useApi'
 import { formatDate } from '@/lib/utils'
 
 export default function Profile() {
   const { user, tier } = useAuth()
+  const navigate = useNavigate()
   const [email, setEmail] = useState(user?.email ?? '')
   const [isEditing, setIsEditing] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const updateUser = useUpdateUser()
+
+  // Sync local email state when user data loads or changes
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email)
+    }
+  }, [user?.email])
 
   const tierColors = {
     free: 'secondary' as const,
     pro: 'success' as const,
     enterprise: 'default' as const,
+  }
+
+  const handleSave = async () => {
+    setSaveError('')
+    setSaveSuccess(false)
+    try {
+      await updateUser.mutateAsync({ email })
+      setSaveSuccess(true)
+      setIsEditing(false)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to update profile'
+      setSaveError(message)
+    }
   }
 
   return (
@@ -50,7 +77,7 @@ export default function Profile() {
               </div>
               <div className="flex justify-between border-b border-border pb-2">
                 <span className="text-sm text-muted-foreground">User ID</span>
-                <span className="text-sm font-mono">{user?.id?.substring(0, 8)}...</span>
+                <span className="text-sm font-mono">{user?.id?.substring(0, 8) ?? ''}...</span>
               </div>
             </div>
           </CardContent>
@@ -81,13 +108,17 @@ export default function Profile() {
                 <Input type="password" value="••••••••" disabled className="pl-9" />
               </div>
             </div>
+            {saveError && <p className="text-sm text-red-400">{saveError}</p>}
+            {saveSuccess && <p className="text-sm text-emerald-400">Profile updated successfully!</p>}
             <div className="flex gap-2">
               {isEditing ? (
                 <>
-                  <Button onClick={() => setIsEditing(false)} variant="outline">
+                  <Button onClick={() => { setIsEditing(false); setEmail(user?.email ?? ''); setSaveError('') }} variant="outline">
                     Cancel
                   </Button>
-                  <Button onClick={() => setIsEditing(false)}>Save Changes</Button>
+                  <Button onClick={handleSave} disabled={updateUser.isPending}>
+                    {updateUser.isPending ? 'Saving...' : 'Save Changes'}
+                  </Button>
                 </>
               ) : (
                 <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
@@ -113,7 +144,7 @@ export default function Profile() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => window.location.href = '/pricing'}>
+            <Button variant="outline" onClick={() => navigate('/pricing')}>
               Manage Plan
             </Button>
           </div>

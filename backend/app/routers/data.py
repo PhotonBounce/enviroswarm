@@ -25,7 +25,7 @@ router = APIRouter(prefix="/data", tags=["data"])
 
 @router.get("", response_model=StandardResponse)
 async def query_data(
-    station_id: Optional[str] = Query(None),
+    station_id: Optional[UUID] = Query(None),
     sensor_type: Optional[str] = Query(None),
     start: Optional[datetime] = Query(None),
     end: Optional[datetime] = Query(None),
@@ -39,7 +39,12 @@ async def query_data(
     retention_days = {"free": 7, "pro": 90, "enterprise": 730}
     max_retention = retention_days.get(user.tier, 7)
     earliest_allowed = datetime.now(timezone.utc) - timedelta(days=max_retention)
-    effective_start = max(start, earliest_allowed) if start else earliest_allowed
+    if start:
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        effective_start = max(start, earliest_allowed)
+    else:
+        effective_start = earliest_allowed
 
     if aggregate and aggregate != "none":
         # Aggregation query using date_trunc
@@ -58,6 +63,8 @@ async def query_data(
             )
             .join(SensorStation)
             .where(SensorStation.user_id == user.id)
+            .where(SensorStation.deleted_at.is_(None))
+            .where(SensorReading.deleted_at.is_(None))
             .where(SensorReading.timestamp >= effective_start)
             .group_by(
                 func.date_trunc(trunc_unit, SensorReading.timestamp),
@@ -66,6 +73,7 @@ async def query_data(
             )
             .order_by("bucket")
             .limit(limit)
+            .offset(offset)
         )
 
         if station_id:
@@ -91,7 +99,7 @@ async def query_data(
         ]
         return StandardResponse(
             data=data,
-            meta={"page": (offset // limit) + 1, "limit": limit, "total": len(data)},
+            meta={"page": (offset // limit) + 1, "limit": limit, "total": None},
         )
 
     # Raw query
@@ -99,6 +107,8 @@ async def query_data(
         select(SensorReading)
         .join(SensorStation)
         .where(SensorStation.user_id == user.id)
+        .where(SensorStation.deleted_at.is_(None))
+        .where(SensorReading.deleted_at.is_(None))
         .where(SensorReading.timestamp >= effective_start)
     )
     if station_id:
@@ -128,14 +138,36 @@ async def nearby(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     radius_km: float = Query(10, ge=0.1, le=500),
-    sensor_type: Optional[str] = Query(None),
+    sensor_type: Optional[str] = Query(None, pattern="^(air_quality|temperature|humidity|noise_level|radiation|water_quality|co2|pm25|pm10|voc)$"),
     user: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     """Find stations near a lat/lon using haversine formula (Python side).
     In production with PostGIS, use ST_DWithin."""
 
-    result = await db.execute(select(SensorStation))
+    # Use a SQL bounding box to avoid loading all stations into memory
+    lat_margin = radius_km / 111.0
+    lon_margin = radius_km / (111.32 * math.cos(math.radians(lat)))
+
+    stmt = (
+        select(SensorStation)
+        .where(SensorStation.user_id == user.id)
+        .where(SensorStation.deleted_at.is_(None))
+        .where(SensorStation.latitude.isnot(None))
+        .where(SensorStation.longitude.isnot(None))
+        .where(
+            and_(
+                SensorStation.latitude >= lat - lat_margin,
+                SensorStation.latitude <= lat + lat_margin,
+                SensorStation.longitude >= lon - lon_margin,
+                SensorStation.longitude <= lon + lon_margin,
+            )
+        )
+    )
+    if sensor_type:
+        stmt = stmt.where(SensorStation.sensor_types.any(sensor_type))
+
+    result = await db.execute(stmt)
     stations = result.scalars().all()
 
     nearby_stations = []

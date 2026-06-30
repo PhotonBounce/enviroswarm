@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLogin } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
+import api from '@/lib/api'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -18,15 +19,17 @@ export default function Login() {
     setError('')
     try {
       const result = await loginMutation.mutateAsync({ email, password })
-      // Fetch user after login
-      const res = await fetch('http://localhost:8000/api/v1/me', {
-        headers: { Authorization: `Bearer ${result.access_token}` },
-      })
-      const userData = await res.json()
-      if (userData.success) {
-        login(result.access_token, userData.data)
-      } else {
-        setError('Failed to load user')
+      // Fetch user after login using the configured axios client
+      try {
+        const userData = await api.get('/me')
+        if (userData.data?.success) {
+          login(result.access_token, userData.data.data)
+        } else {
+          setError(userData.data?.error || 'Failed to load user')
+        }
+      } catch (fetchErr: unknown) {
+        const fetchMessage = fetchErr instanceof Error ? fetchErr.message : 'Failed to load user'
+        setError(fetchMessage)
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'

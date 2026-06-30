@@ -43,7 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false)
   }, [])
 
+  // Listen for unauthorized events from the API interceptor
+  useEffect(() => {
+    const handler = () => {
+      localStorage.removeItem('enviroswarm_token')
+      localStorage.removeItem('enviroswarm_user')
+      setToken(null)
+      setUserState(null)
+    }
+    window.addEventListener('enviroswarm:unauthorized', handler)
+    return () => window.removeEventListener('enviroswarm:unauthorized', handler)
+  }, [])
+
   const login = useCallback((newToken: string, newUser: User) => {
+    // SECURITY NOTE: localStorage is vulnerable to XSS. Consider migrating to httpOnly cookies.
     localStorage.setItem('enviroswarm_token', newToken)
     localStorage.setItem('enviroswarm_user', JSON.stringify(newUser))
     setToken(newToken)

@@ -1,7 +1,7 @@
 """Tests for station endpoints."""
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.database import engine, Base
@@ -17,15 +17,15 @@ async def reset_db():
 
 @pytest.fixture
 async def auth_client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # Register and login
         await ac.post("/api/v1/auth/register", json={
             "email": "station@example.com",
-            "password": "password123"
+            "password": "Password123"
         })
         r = await ac.post("/api/v1/auth/login", json={
             "email": "station@example.com",
-            "password": "password123"
+            "password": "Password123"
         })
         token = r.json()["data"]["access_token"]
         ac.headers["Authorization"] = f"Bearer {token}"

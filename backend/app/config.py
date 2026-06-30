@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     db_pool_pre_ping: bool = True
 
     # Security
-    secret_key: str = Field(default="CHANGE-ME-IN-PRODUCTION-32CHARS-MIN", min_length=32)
+    secret_key: str = Field(..., min_length=32)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60  # 1 hour for access tokens
     refresh_token_expire_days: int = 7

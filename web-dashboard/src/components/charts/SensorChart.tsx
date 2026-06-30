@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   LineChart,
   Line,
@@ -28,18 +29,30 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
     )
   }
 
-  // Group data by sensor_type for the chart
-  const chartData = data.map((r) => ({
-    timestamp: new Date(r.timestamp).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    value: r.value,
-    sensor_type: r.sensor_type,
-    unit: r.unit,
-  }))
+  // Group data by timestamp and sensor_type for multi-line chart
+  const chartData = useMemo(() => {
+    const timestamps = new Map<string, Record<string, number>>()
+    for (const r of data) {
+      const ts = new Date(r.timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      if (!timestamps.has(ts)) timestamps.set(ts, {})
+      timestamps.get(ts)![r.sensor_type] = r.value
+    }
+    return Array.from(timestamps.entries()).map(([timestamp, values]) => ({
+      timestamp,
+      ...values,
+    }))
+  }, [data])
+
+  const types = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of data) set.add(r.sensor_type)
+    return Array.from(set)
+  }, [data])
 
   const ChartComponent = type === 'area' ? AreaChart : LineChart
   const DataComponent = type === 'area' ? Area : Line
@@ -48,7 +61,15 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
     <ResponsiveContainer width="100%" height={320}>
       <ChartComponent data={chartData}>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-        <XAxis dataKey="timestamp" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+        <XAxis
+          dataKey="timestamp"
+          stroke="#9ca3af"
+          fontSize={12}
+          tickLine={false}
+          axisLine={false}
+          angle={-45}
+          height={60}
+        />
         <YAxis
           stroke="#9ca3af"
           fontSize={12}
@@ -63,14 +84,32 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
             borderRadius: '0.5rem',
             color: '#f3f4f6',
           }}
-          formatter={(value: number) => [formatNumber(value, 2), 'Value']}
+          formatter={(value: number, name: string) => [formatNumber(value, 2), name]}
         />
         {showLegend && <Legend />}
-        {type === 'area' ? (
-          <Area type="monotone" dataKey="value" stroke={getSensorTypeColor(data[0]?.sensor_type ?? 'air_quality')} fill={getSensorTypeColor(data[0]?.sensor_type ?? 'air_quality')} fillOpacity={0.2} strokeWidth={2} dot={false} />
-        ) : (
-          <Line type="monotone" dataKey="value" stroke={getSensorTypeColor(data[0]?.sensor_type ?? 'air_quality')} strokeWidth={2} dot={false} />
-        )}
+        {types.map((sensorType) => (
+          type === 'area' ? (
+            <Area
+              key={sensorType}
+              type="monotone"
+              dataKey={sensorType}
+              stroke={getSensorTypeColor(sensorType)}
+              fill={getSensorTypeColor(sensorType)}
+              fillOpacity={0.2}
+              strokeWidth={2}
+              dot={false}
+            />
+          ) : (
+            <Line
+              key={sensorType}
+              type="monotone"
+              dataKey={sensorType}
+              stroke={getSensorTypeColor(sensorType)}
+              strokeWidth={2}
+              dot={false}
+            />
+          )
+        ))}
       </ChartComponent>
     </ResponsiveContainer>
   )

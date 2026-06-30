@@ -101,6 +101,11 @@ def decode_token(token: str, expected_type: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Expected {expected_type} token",
         )
+    if not payload.get("sub"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing sub claim",
+        )
     return payload
 
 
@@ -126,11 +131,11 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
         )
 
-    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True))
+    result = await db.execute(select(User).where(User.id == user_id, User.is_active == True, User.deleted_at.is_(None)))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found, inactive, or deleted"
         )
     return user
 

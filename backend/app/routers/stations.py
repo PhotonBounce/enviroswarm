@@ -1,4 +1,5 @@
-"""Sensor stations router."""
+from uuid import UUID
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, func
@@ -8,7 +9,7 @@ from typing import Optional
 from app.auth import get_current_user
 from app.database import get_db
 from app.models import SensorStation, User
-from app.schemas import StandardResponse, StationCreateRequest, StationResponse
+from app.schemas import StandardResponse, StationCreateRequest, StationUpdateRequest, StationResponse
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -19,7 +20,16 @@ async def create_station(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    # Tier limits
+    # Tier limits — lock user row to prevent race condition
+    result = await db.execute(
+        select(User).where(User.id == user.id).with_for_update()
+    )
+    locked_user = result.scalar_one_or_none()
+    if locked_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
     result = await db.execute(
         select(func.count(SensorStation.id)).where(
             SensorStation.user_id == user.id, SensorStation.deleted_at.is_(None)
@@ -78,7 +88,7 @@ async def list_stations(
 
 @router.get("/{station_id}", response_model=StandardResponse)
 async def get_station(
-    station_id: str,
+    station_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
@@ -101,8 +111,8 @@ async def get_station(
 
 @router.patch("/{station_id}", response_model=StandardResponse)
 async def update_station(
-    station_id: str,
-    body: StationCreateRequest,
+    station_id: UUID,
+    body: StationUpdateRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
@@ -119,11 +129,16 @@ async def update_station(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
 
-    station.name = body.name
-    station.latitude = body.latitude
-    station.longitude = body.longitude
-    station.sensor_types = body.sensor_types
-    station.status = body.status
+    if body.name is not None:
+        station.name = body.name
+    if body.latitude is not None:
+        station.latitude = body.latitude
+    if body.longitude is not None:
+        station.longitude = body.longitude
+    if body.sensor_types is not None:
+        station.sensor_types = body.sensor_types
+    if body.status is not None:
+        station.status = body.status
     await db.commit()
     await db.refresh(station)
     return StandardResponse(
@@ -133,7 +148,7 @@ async def update_station(
 
 @router.delete("/{station_id}", response_model=StandardResponse)
 async def delete_station(
-    station_id: str,
+    station_id: UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
@@ -149,7 +164,6 @@ async def delete_station(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
-    from datetime import datetime, timezone
     station.deleted_at = datetime.now(timezone.utc)
     await db.commit()
     return StandardResponse(data={"deleted": str(station_id)})

@@ -7,7 +7,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleString('en-US', {
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -16,10 +18,12 @@ export function formatDate(date: string | Date): string {
 }
 
 export function formatNumber(value: number, decimals = 2): string {
+  if (!isFinite(value)) return '—'
   return value.toFixed(decimals)
 }
 
 export function capitalize(str: string): string {
+  if (typeof str !== 'string') return ''
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 

@@ -37,13 +37,45 @@ export default function DataExplorer() {
     const params: typeof queryParams = {}
     if (stationId) params.station_id = stationId
     if (sensorType) params.sensor_type = sensorType
-    if (start) params.start = new Date(start).toISOString()
-    if (end) params.end = new Date(end).toISOString()
+    if (start) {
+      const startDate = new Date(start)
+      if (!isNaN(startDate.getTime())) {
+        params.start = startDate.toISOString()
+      }
+    }
+    if (end) {
+      const endDate = new Date(end)
+      if (!isNaN(endDate.getTime())) {
+        params.end = endDate.toISOString()
+      }
+    }
     params.limit = 500
     setQueryParams(params)
   }
 
   const filteredReadings = readings ?? []
+
+  const handleExportCsv = () => {
+    if (!filteredReadings.length) return
+    const headers = ['timestamp', 'station_id', 'sensor_type', 'value', 'unit']
+    const rows = filteredReadings.map((r: SensorReading) => [
+      r.timestamp,
+      r.station_id,
+      r.sensor_type,
+      String(r.value),
+      r.unit,
+    ])
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'sensor-data.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const stationNameMap = new Map(stations?.map((s) => [s.id, s.name]))
 
   return (
     <div className="space-y-6">
@@ -91,7 +123,7 @@ export default function DataExplorer() {
               <Search className="mr-2 h-4 w-4" />
               Run Query
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExportCsv} disabled={!filteredReadings.length}>
               <Download className="mr-2 h-4 w-4" />
               Export CSV
             </Button>
@@ -142,7 +174,7 @@ export default function DataExplorer() {
                     {filteredReadings.slice(0, 50).map((reading: SensorReading) => (
                       <TableRow key={reading.id}>
                         <TableCell>{formatDate(reading.timestamp)}</TableCell>
-                        <TableCell>{reading.station_id}</TableCell>
+                        <TableCell>{stationNameMap.get(reading.station_id) || reading.station_id}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{capitalize(reading.sensor_type)}</Badge>
                         </TableCell>

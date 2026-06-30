@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api, { type ApiResponse } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import type {
   User,
   SensorStation,
@@ -19,6 +20,9 @@ export function useLogin() {
   return useMutation({
     mutationFn: async (data: LoginRequest) => {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', data)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Login failed')
+      }
       return res.data.data
     },
   })
@@ -28,19 +32,42 @@ export function useRegister() {
   return useMutation({
     mutationFn: async (data: RegisterRequest) => {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/register', data)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Registration failed')
+      }
       return res.data.data
     },
   })
 }
 
 export function useMe() {
+  const { isAuthenticated } = useAuth()
   return useQuery({
     queryKey: ['me'],
     queryFn: async () => {
       const res = await api.get<ApiResponse<User>>('/me')
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch user')
+      }
       return res.data.data
     },
-    enabled: !!localStorage.getItem('enviroswarm_token'),
+    enabled: isAuthenticated,
+  })
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: Partial<Pick<User, 'email'>>) => {
+      const res = await api.patch<ApiResponse<User>>('/me', data)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Update failed')
+      }
+      return res.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
   })
 }
 
@@ -50,6 +77,9 @@ export function useStations() {
     queryKey: ['stations'],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorStation[]>>('/stations')
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch stations')
+      }
       return res.data.data
     },
   })
@@ -60,6 +90,9 @@ export function useStation(id: string) {
     queryKey: ['stations', id],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorStation>>(`/stations/${id}`)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch station')
+      }
       return res.data.data
     },
     enabled: !!id,
@@ -71,6 +104,9 @@ export function useCreateStation() {
   return useMutation({
     mutationFn: async (data: CreateStationRequest) => {
       const res = await api.post<ApiResponse<SensorStation>>('/stations', data)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to create station')
+      }
       return res.data.data
     },
     onSuccess: () => {
@@ -87,6 +123,9 @@ export function useSensorData(params: DataQueryParams) {
       const res = await api.get<ApiResponse<SensorReading[]>>('/data', {
         params,
       })
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch sensor data')
+      }
       return res.data.data
     },
   })
@@ -99,6 +138,9 @@ export function useNearbyData(params: NearbyQueryParams) {
       const res = await api.get<ApiResponse<SensorReading[]>>('/data/nearby', {
         params,
       })
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch nearby data')
+      }
       return res.data.data
     },
   })
@@ -110,6 +152,9 @@ export function useApiKeys() {
     queryKey: ['apikeys'],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ApiKey[]>>('/apikeys')
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch API keys')
+      }
       return res.data.data
     },
   })
@@ -120,6 +165,9 @@ export function useCreateApiKey() {
   return useMutation({
     mutationFn: async (name: string) => {
       const res = await api.post<ApiResponse<ApiKey>>('/apikeys', { name })
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to create API key')
+      }
       return res.data.data
     },
     onSuccess: () => {
@@ -133,6 +181,9 @@ export function useDeleteApiKey() {
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.delete<ApiResponse<unknown>>(`/apikeys/${id}`)
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to delete API key')
+      }
       return res.data.data
     },
     onSuccess: () => {
@@ -147,16 +198,26 @@ export function usePricing() {
     queryKey: ['pricing'],
     queryFn: async () => {
       const res = await api.get<ApiResponse<PricingTier[]>>('/pricing')
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Failed to fetch pricing')
+      }
       return res.data.data
     },
   })
 }
 
 export function useSubscribe() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (tier: string) => {
       const res = await api.post<ApiResponse<unknown>>('/subscribe', { tier })
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Subscription failed')
+      }
       return res.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] })
     },
   })
 }

@@ -19,7 +19,7 @@ const recentActivity = [
 ]
 
 export default function Dashboard() {
-  const { data: stations } = useStations()
+  const { data: stations, isLoading, error } = useStations()
 
   return (
     <div className="space-y-6">
@@ -53,7 +53,14 @@ export default function Dashboard() {
             <CardDescription>Active sensor stations in your network</CardDescription>
           </CardHeader>
           <CardContent>
-            {stations && stations.length > 0 ? (
+            {isLoading ? (
+              <div className="text-center text-muted-foreground py-8">Loading stations...</div>
+            ) : error ? (
+              <div className="text-center text-red-400 py-8">
+                <p>Failed to load stations</p>
+                <p className="text-xs">{error instanceof Error ? error.message : 'Unknown error'}</p>
+              </div>
+            ) : stations && stations.length > 0 ? (
               <div className="space-y-3">
                 {stations.slice(0, 3).map((station: SensorStation) => (
                   <div key={station.id} className="flex items-center justify-between rounded-lg border border-border p-3">
