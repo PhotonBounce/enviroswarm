@@ -13,10 +13,8 @@ import gzip
 import hashlib
 import json
 import os
-import random
 import sys
 import time
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
@@ -329,7 +327,7 @@ def run_seed(
     ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
     wait_for_backend: bool = False,
     email: str = DEMO_EMAIL,
-    password: str = DEMO_PASSWORD,
+    password: Optional[str] = DEMO_PASSWORD,
     tier: str = DEMO_TIER,
     duration_months: int = 1,
 ) -> Dict[str, Any]:

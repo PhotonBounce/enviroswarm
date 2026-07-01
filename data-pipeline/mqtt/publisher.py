@@ -67,8 +67,8 @@ def publish_readings(
     
     if not connected:
         print("[MQTT] Connection timed out.")
-        client.loop_stop()
         client.disconnect()
+        client.loop_stop()
         return 0
     
     published = 0

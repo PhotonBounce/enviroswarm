@@ -10,7 +10,6 @@ import sys
 import threading
 import time
 import hashlib
-import uuid
 from typing import Optional
 
 try:
@@ -80,7 +79,7 @@ def _post_with_retry(
     else:
         data = raw_json
     headers["Content-Type"] = "application/json"
-    headers["X-Idempotency-Key"] = hashlib.sha256(raw_json.encode()).hexdigest()
+    headers["X-Idempotency-Key"] = hashlib.sha256(raw_json).hexdigest()
 
     for attempt in range(max_retries + 1):
         try:
@@ -289,7 +288,14 @@ def start_subscriber(
         print("[MQTT Sub] WARNING: No auth_token provided. API requests may fail with 401.")
 
     if run_duration_seconds:
-        time.sleep(run_duration_seconds)
+        try:
+            time.sleep(run_duration_seconds)
+        except KeyboardInterrupt:
+            print("[MQTT Sub] Stopped by user during timed run, shutting down gracefully...")
+            stop_event.set()
+            _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
+            print("[MQTT Sub] Stopped.")
+            return
         stop_event.set()
         _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
         print("[MQTT Sub] Stopped.")
