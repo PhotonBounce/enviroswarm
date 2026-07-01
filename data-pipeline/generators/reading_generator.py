@@ -16,6 +16,21 @@ _CITY_OFFSETS = {
 }
 
 
+# Additive outlier offsets per sensor type (kept visible, not clamped away)
+_OUTLIER_OFFSETS = {
+    "temperature": [30, -30, 50],
+    "humidity": [40, -40, 60],
+    "co2": [500, -500, 1000],
+    "pm25": [200, -200, 400],
+    "pm10": [300, -300, 600],
+    "noise_level": [50, -50, 80],
+    "radiation": [1.0, -1.0, 2.0],
+    "air_quality": [300, -300, 500],
+    "water_quality": [50, -50, 80],
+    "voc": [1000, -1000, 2000],
+}
+
+
 def _local_hour(timestamp: datetime, city: str) -> int:
     """Convert UTC timestamp to local solar hour for the given city."""
     offset = _CITY_OFFSETS.get(city, 0)
@@ -200,20 +215,6 @@ def generate_readings_for_station(
         intervals.append(current)
         current += timedelta(minutes=interval_minutes)
 
-    # Additive outlier offsets per sensor type (kept visible, not clamped away)
-    OUTLIER_OFFSETS = {
-        "temperature": [30, -30, 50],
-        "humidity": [40, -40, 60],
-        "co2": [500, -500, 1000],
-        "pm25": [200, -200, 400],
-        "pm10": [300, -300, 600],
-        "noise_level": [50, -50, 80],
-        "radiation": [1.0, -1.0, 2.0],
-        "air_quality": [300, -300, 500],
-        "water_quality": [50, -50, 80],
-        "voc": [1000, -1000, 2000],
-    }
-
     # Generate per-interval, per-sensor
     for ts in intervals:
         # Simulate missing interval (whole timestamp dropped for all sensors)
@@ -272,7 +273,7 @@ def generate_readings_for_station(
 
             # Inject outlier using additive offsets so bounded sensors still show extremes
             if random.random() < outlier_rate:
-                offset = random.choice(OUTLIER_OFFSETS.get(st, [50, -40, 100]))
+                offset = random.choice(_OUTLIER_OFFSETS.get(st, [50, -40, 100]))
                 value += offset
                 metadata["outlier"] = True
                 # Only clamp negative values for physically non-negative quantities;
