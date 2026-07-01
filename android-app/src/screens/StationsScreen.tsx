@@ -88,10 +88,14 @@ export default function StationsScreen({ navigation }: Props) {
       Alert.alert('Validation', 'Longitude must be a valid number');
       return;
     }
+    if (latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+      Alert.alert('Validation', 'Latitude must be between -90 and 90, and longitude between -180 and 180');
+      return;
+    }
     setIsCreating(true);
     try {
       const res = await apiClient.post<ApiResponse<SensorStation>>('/stations', {
-        name,
+        name: name.trim(),
         sensor_types: selectedTypes,
         latitude: latVal,
         longitude: lonVal,

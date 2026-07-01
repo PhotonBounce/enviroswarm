@@ -206,7 +206,7 @@ def list_stations(session: requests.Session, token: str, api_base: str) -> List[
         if not isinstance(data, list) or not data:
             break
         stations.extend(data)
-        meta = body.get("meta", {})
+        meta = body.get("meta") or {}
         total = meta.get("total") or 0
         if offset + limit >= total:
             break

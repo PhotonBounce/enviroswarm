@@ -116,7 +116,11 @@ export function useAuth() {
   };
 
   const logout = async (): Promise<void> => {
-    await SecureStore.deleteItemAsync('access_token');
+    try {
+      await SecureStore.deleteItemAsync('access_token');
+    } catch (storeErr) {
+      // ignore SecureStore errors; proceed with clearing React state
+    }
     clearCachedToken();
     setUser(null);
   };

@@ -75,40 +75,41 @@ def publish_readings(
         return 0
     
     published = 0
-    for r in readings:
-        if not client.is_connected():
-            print("[MQTT] Connection lost during publish loop.")
-            break
-        
-        station_id = r.get("station_id", "unknown")
-        sensor_type = r.get("sensor_type", "unknown")
-        topic = f"{topic_prefix}/{station_id}/{sensor_type}"
-        payload = json.dumps({
-            "station_id": station_id,
-            "sensor_type": sensor_type,
-            "value": r.get("value"),
-            "unit": r.get("unit"),
-            "timestamp": r.get("timestamp"),
-            "metadata": r.get("metadata", {}),
-        })
-        
-        try:
-            info = client.publish(topic, payload, qos=1)
-            info.wait_for_publish(timeout=5)
-            if info.is_published():
-                published += 1
-            else:
-                print(f"[MQTT] Publish not confirmed for {topic}")
-        except Exception as e:
-            print(f"[MQTT] Publish error: {e}")
-        
-        if delay_seconds:
-            time.sleep(delay_seconds)
-    
     try:
-        client.disconnect()
-        client.loop_stop()
-    except Exception as e:
-        print(f"[MQTT] Warning: cleanup error during disconnect/loop_stop: {e}")
+        for r in readings:
+            if not client.is_connected():
+                print("[MQTT] Connection lost during publish loop.")
+                break
+            
+            station_id = r.get("station_id", "unknown")
+            sensor_type = r.get("sensor_type", "unknown")
+            topic = f"{topic_prefix}/{station_id}/{sensor_type}"
+            payload = json.dumps({
+                "station_id": station_id,
+                "sensor_type": sensor_type,
+                "value": r.get("value"),
+                "unit": r.get("unit"),
+                "timestamp": r.get("timestamp"),
+                "metadata": r.get("metadata", {}),
+            })
+            
+            try:
+                info = client.publish(topic, payload, qos=1)
+                info.wait_for_publish(timeout=5)
+                if info.is_published():
+                    published += 1
+                else:
+                    print(f"[MQTT] Publish not confirmed for {topic}")
+            except Exception as e:
+                print(f"[MQTT] Publish error: {e}")
+            
+            if delay_seconds:
+                time.sleep(delay_seconds)
+    finally:
+        try:
+            client.disconnect()
+            client.loop_stop()
+        except Exception as e:
+            print(f"[MQTT] Warning: cleanup error during disconnect/loop_stop: {e}")
     print(f"[MQTT] Published {published} messages.")
     return published
