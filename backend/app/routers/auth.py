@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
@@ -81,8 +82,14 @@ async def register(
         tier="free",
     )
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+        )
 
     return StandardResponse(
         data=UserResponse.model_validate(user).model_dump(mode="json")
@@ -146,7 +153,7 @@ async def refresh_token(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    payload = decode_refresh_token(body.refresh_token)
+    payload = await decode_refresh_token(body.refresh_token)
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
@@ -184,8 +191,11 @@ async def refresh_token(
 
     # Revoke old refresh token
     old_jti = payload.get("jti")
-    if old_jti:
-        revoke_refresh_token(old_jti)
+    old_exp = payload.get("exp")
+    if old_jti and old_exp:
+        from datetime import datetime, timezone
+        expires_at = datetime.fromtimestamp(old_exp, tz=timezone.utc)
+        await revoke_refresh_token(old_jti, expires_at)
 
     # Update cookies
     response.set_cookie(value=new_access, **COOKIE_SETTINGS)
@@ -210,10 +220,13 @@ async def logout(
     refresh_token = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
     if refresh_token:
         try:
-            payload = decode_refresh_token(refresh_token)
+            payload = await decode_refresh_token(refresh_token)
             jti = payload.get("jti")
-            if jti:
-                revoke_refresh_token(jti)
+            exp = payload.get("exp")
+            if jti and exp:
+                from datetime import datetime, timezone
+                expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+                await revoke_refresh_token(jti, expires_at)
         except HTTPException:
             pass  # fail-safe: still clear cookies even if token is invalid
 

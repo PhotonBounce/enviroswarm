@@ -63,7 +63,7 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
         expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
     now = datetime.now(timezone.utc)
     payload = {
-        "sub": str(user_id),
+        "sub": user_id,
         "iat": now,
         "exp": now + expires_delta,
         "type": "access",
@@ -76,7 +76,7 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
 def create_refresh_token(user_id: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
-        "sub": str(user_id),
+        "sub": user_id,
         "iat": now,
         "exp": now + timedelta(days=settings.refresh_token_expire_days),
         "type": "refresh",
@@ -86,7 +86,7 @@ def create_refresh_token(user_id: str) -> str:
     return token
 
 
-def _decode_token(token: str, expected_type: str) -> dict:
+async def _decode_token(token: str, expected_type: str) -> dict:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
     except jwt.ExpiredSignatureError:
@@ -110,7 +110,7 @@ def _decode_token(token: str, expected_type: str) -> dict:
         )
     if expected_type == "refresh":
         jti = payload.get("jti")
-        if jti and is_refresh_token_revoked(jti):
+        if jti and await is_refresh_token_revoked(jti):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh token has been revoked",
@@ -118,31 +118,42 @@ def _decode_token(token: str, expected_type: str) -> dict:
     return payload
 
 
-def decode_access_token(token: str) -> dict:
-    return _decode_token(token, "access")
+async def decode_access_token(token: str) -> dict:
+    return await _decode_token(token, "access")
 
 
-def decode_refresh_token(token: str) -> dict:
-    return _decode_token(token, "refresh")
+async def decode_refresh_token(token: str) -> dict:
+    return await _decode_token(token, "refresh")
 
 
 # ---------------------------------------------------------------------------
-# Refresh token revocation (in-memory; replace with Redis in production)
-#
-# TODO: In production, replace this with Redis or a similar persistent,
-# distributed store to ensure revoked tokens are recognized across all
-# server instances.
+# Refresh token revocation (database-backed)
 # ---------------------------------------------------------------------------
 
-_refresh_token_blacklist: set = set()
+from app.database import get_sessionmaker
+from app.models import RevokedToken
 
 
-def revoke_refresh_token(jti: str) -> None:
-    _refresh_token_blacklist.add(jti)
+async def revoke_refresh_token(jti: str, expires_at: datetime) -> None:
+    async with get_sessionmaker()() as session:
+        session.add(RevokedToken(jti=jti, revoked_at=datetime.now(timezone.utc), expires_at=expires_at))
+        await session.commit()
 
 
-def is_refresh_token_revoked(jti: str) -> bool:
-    return jti in _refresh_token_blacklist
+async def is_refresh_token_revoked(jti: str) -> bool:
+    async with get_sessionmaker()() as session:
+        result = await session.execute(select(RevokedToken).where(RevokedToken.jti == jti))
+        return result.scalar_one_or_none() is not None
+
+
+async def cleanup_revoked_tokens() -> None:
+    """Delete expired revoked token entries."""
+    async with get_sessionmaker()() as session:
+        from sqlalchemy import delete
+        await session.execute(
+            delete(RevokedToken).where(RevokedToken.expires_at < datetime.now(timezone.utc))
+        )
+        await session.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +161,7 @@ def is_refresh_token_revoked(jti: str) -> bool:
 # ---------------------------------------------------------------------------
 
 async def _get_user_from_token(token: str, db: AsyncSession) -> User:
-    payload = decode_access_token(token)
+    payload = await decode_access_token(token)
     user_id: Optional[str] = payload.get("sub")
     if user_id is None:
         raise HTTPException(

@@ -341,6 +341,23 @@ def run_seed(
     """
     effective_api_base = api_base or API_BASE
 
+    if stations <= 0:
+        raise ValueError("stations must be > 0")
+    if days <= 0:
+        raise ValueError("days must be > 0")
+    if batch_delay < 0:
+        raise ValueError("batch_delay must be >= 0")
+    if ingest_timeout <= 0:
+        raise ValueError("ingest_timeout must be > 0")
+    if not email:
+        raise ValueError("email must not be empty")
+    if not password:
+        raise ValueError("password must not be empty")
+    if tier not in {"free", "pro", "enterprise"}:
+        raise ValueError("tier must be one of: free, pro, enterprise")
+    if duration_months < 1:
+        raise ValueError("duration_months must be >= 1")
+
     start_time = time.time()
     summary = {
         "dry_run": dry_run,

@@ -5,10 +5,11 @@ import math
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.dependencies import rate_limit_dependency, require_permission
 from app.models import SensorReading, SensorStation, User
@@ -19,6 +20,13 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/data", tags=["data"])
+
+
+def _date_trunc(unit, column):
+    if get_settings().database_url.startswith("sqlite"):
+        fmt_map = {"hour": "%Y-%m-%d %H:00:00", "day": "%Y-%m-%d 00:00:00", "month": "%Y-%m-01 00:00:00"}
+        return func.strftime(fmt_map[unit], column)
+    return func.date_trunc(unit, column)
 
 
 @router.get("", response_model=StandardResponse)

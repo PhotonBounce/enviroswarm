@@ -245,6 +245,14 @@ def start_subscriber(
     """
     if mqtt is None:
         raise ImportError("paho-mqtt is required. Install it: pip install paho-mqtt")
+    if broker_port <= 0:
+        raise ValueError("broker_port must be > 0")
+    if max_queue_size <= 0:
+        raise ValueError("max_queue_size must be > 0")
+    if ingest_timeout <= 0:
+        raise ValueError("ingest_timeout must be > 0")
+    if max_retries < 0:
+        raise ValueError("max_retries must be >= 0")
 
     session = requests.Session()
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})

@@ -12,17 +12,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, get_sessionmaker
-from app.models import ApiKey, User
+from app.models import ApiKey, RateLimitEntry, User
 from app.auth import decode_access_token
 from app.utils.crypto import hash_key, extract_prefix
 from app.constants import RATE_LIMITS
 
 # ---------------------------------------------------------------------------
-# In-memory rate-limit store: { key: (count, window_start) }
-#
-# TODO: In production, replace this with Redis or a similar distributed
-# store to ensure rate limits are enforced consistently across multiple
-# server instances.
+# Database-backed rate limiting
 # ---------------------------------------------------------------------------
 
 _rate_limit_store: dict = {}
@@ -35,39 +31,46 @@ def _get_rate_limit_key(identifier: str, route: str) -> str:
     return f"{identifier}:{route}"
 
 
-def _evict_rate_limit_entries(now: int) -> None:
-    """Evict expired entries and enforce max size via LRU."""
-    window = 60
-    expired = [k for k, (count, window_start) in _rate_limit_store.items() if now - window_start >= window]
-    for k in expired:
-        _rate_limit_store.pop(k, None)
-    # If still too large, evict oldest entries (by window_start)
-    if len(_rate_limit_store) > _MAX_RATE_LIMIT_ENTRIES:
-        sorted_items = sorted(_rate_limit_store.items(), key=lambda x: x[1][1])
-        to_evict = len(_rate_limit_store) - _MAX_RATE_LIMIT_ENTRIES
-        for k, _ in sorted_items[:to_evict]:
-            _rate_limit_store.pop(k, None)
-
-
 async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
     """Return True if request is allowed, False if rate-limited."""
     key = _get_rate_limit_key(identifier, route)
-    now = int(time.time())
-    window = 60  # 1 minute
+    now = datetime.now(timezone.utc)
+    window = timedelta(minutes=1)
 
-    async with _rate_limit_lock:
-        _evict_rate_limit_entries(now)
-        count, window_start = _rate_limit_store.get(key, (0, now))
-        if now - window_start >= window:
-            # new window
-            _rate_limit_store[key] = (1, now)
+    async with get_sessionmaker()() as session:
+        result = await session.execute(
+            select(RateLimitEntry).where(RateLimitEntry.key == key)
+        )
+        entry = result.scalar_one_or_none()
+
+        if entry is None:
+            session.add(RateLimitEntry(key=key, count=1, window_start=now))
+            await session.commit()
             return True
 
-        if count >= limit:
+        if now - entry.window_start >= window:
+            entry.count = 1
+            entry.window_start = now
+            await session.commit()
+            return True
+
+        if entry.count >= limit:
             return False
 
-        _rate_limit_store[key] = (count + 1, window_start)
+        entry.count += 1
+        await session.commit()
         return True
+
+
+async def cleanup_rate_limit_entries() -> None:
+    """Delete expired rate limit entries."""
+    async with get_sessionmaker()() as session:
+        from sqlalchemy import delete
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=1)
+        await session.execute(
+            delete(RateLimitEntry).where(RateLimitEntry.window_start < cutoff)
+        )
+        await session.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -158,12 +161,8 @@ async def get_current_user_or_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication"
         )
     token = auth[7:].strip()
-    payload = decode_access_token(token)
+    payload = await decode_access_token(token)
     user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
     try:
         user_uuid = uuid.UUID(user_id)
     except ValueError:
