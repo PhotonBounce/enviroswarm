@@ -23,7 +23,7 @@ export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: D
       const content = contentRef.current
       if (content) {
         const focusable = content.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
         )
         if (focusable) {
           focusable.focus()

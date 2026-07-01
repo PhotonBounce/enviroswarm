@@ -32,7 +32,11 @@ export function useAuth() {
       // Only clear the session on 401 (unauthorized). For 403, 500, or network
       // errors, preserve the token so the user can retry later.
       if (err instanceof AxiosError && err.response?.status === 401) {
-        await SecureStore.deleteItemAsync('access_token');
+        try {
+          await SecureStore.deleteItemAsync('access_token');
+        } catch (storeErr) {
+          // ignore SecureStore errors; preserve original error
+        }
         clearCachedToken();
         setUser(null);
       }

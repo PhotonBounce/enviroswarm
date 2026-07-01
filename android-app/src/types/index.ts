@@ -53,6 +53,7 @@ export interface SensorStation {
   sensor_types: SensorType[];
   status: 'active' | 'inactive' | 'maintenance';
   created_at: string;
+  updated_at: string;
 }
 
 export interface SensorReading {

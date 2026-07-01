@@ -1,7 +1,6 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
 import hmac
-import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional

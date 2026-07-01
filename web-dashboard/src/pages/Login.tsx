@@ -12,7 +12,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const loginMutation = useLogin()
-  const { login } = useAuth()
+  const { login, logout } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,6 +31,7 @@ export default function Login() {
       } catch (fetchErr: unknown) {
         const fetchMessage = fetchErr instanceof Error ? fetchErr.message : 'Failed to load user'
         setError(fetchMessage)
+        logout()
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'

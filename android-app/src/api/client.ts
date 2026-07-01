@@ -53,7 +53,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
       cachedToken = null;
-      await SecureStore.deleteItemAsync('access_token');
+      try {
+        await SecureStore.deleteItemAsync('access_token');
+      } catch (storeErr) {
+        // ignore SecureStore errors; preserve original 401 error
+      }
       authEvents.emitUnauthorized();
     }
     return Promise.reject(error);

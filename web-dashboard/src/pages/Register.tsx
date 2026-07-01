@@ -13,7 +13,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const registerMutation = useRegister()
-  const { login } = useAuth()
+  const { login, logout } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +44,7 @@ export default function Register() {
       } catch (fetchErr: unknown) {
         const fetchMessage = fetchErr instanceof Error ? fetchErr.message : 'Failed to load user'
         setError(fetchMessage)
+        logout()
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
