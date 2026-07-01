@@ -229,15 +229,21 @@ async def logout(
     """Clear auth cookies and log out the user."""
     token_found = False
 
+    # Always clear cookies if they exist in the request
+    had_cookies = bool(request.cookies.get("access_token") or request.cookies.get("refresh_token"))
+    if had_cookies:
+        response.delete_cookie(COOKIE_SETTINGS["key"])
+        response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
+
     # Try access token from header or cookie
     auth_header = request.headers.get("Authorization", "")
-    access_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    access_token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else None
     if not access_token:
         access_token = request.cookies.get("access_token")
     if access_token:
+        token_found = True
         try:
             await decode_access_token(access_token)
-            token_found = True
         except HTTPException:
             pass
 
@@ -254,11 +260,9 @@ async def logout(
                 expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
                 await revoke_refresh_token(jti, expires_at)
         except HTTPException:
-            pass  # fail-safe: still clear cookies even if token is invalid
+            pass
 
-    if token_found:
-        response.delete_cookie(COOKIE_SETTINGS["key"])
-        response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
+    if token_found or had_cookies:
         return StandardResponse(data={"logged_out": True})
 
     return StandardResponse(data={"logged_out": False}, error="No token found")

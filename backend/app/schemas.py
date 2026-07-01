@@ -114,6 +114,8 @@ class StationUpdateRequest(BaseModel):
         lon_set = "longitude" in self.model_fields_set
         if lat_set != lon_set:
             raise ValueError("latitude and longitude must both be provided or both be omitted")
+        if lat_set and lon_set and (self.latitude is not None) != (self.longitude is not None):
+            raise ValueError("latitude and longitude must both be non-null or both be null")
         return self
 
 

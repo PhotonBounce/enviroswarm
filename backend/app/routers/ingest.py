@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select, func
+from sqlalchemy import delete, select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +36,13 @@ async def ingest(
     key_hash = None
     if idempotency_key:
         key_hash = hashlib.sha256(f"{user.id}:{idempotency_key}".encode()).hexdigest()
+        # Cleanup expired keys to allow reinsertion
+        await db.execute(
+            delete(IdempotencyKey).where(
+                IdempotencyKey.user_id == user.id,
+                IdempotencyKey.expires_at <= datetime.now(timezone.utc),
+            )
+        )
         idem_result = await db.execute(
             select(IdempotencyKey).where(
                 IdempotencyKey.user_id == user.id,
@@ -146,6 +153,23 @@ async def ingest(
     except IntegrityError as exc:
         await db.rollback()
         if idempotency_key and key_hash and exc.orig is not None and "uq_idempotency_user_key" in str(exc.orig):
+            # Check for expired key and delete it before retrying
+            expired_result = await db.execute(
+                select(IdempotencyKey).where(
+                    IdempotencyKey.user_id == user.id,
+                    IdempotencyKey.key_hash == key_hash,
+                    IdempotencyKey.expires_at <= datetime.now(timezone.utc),
+                )
+            )
+            expired = expired_result.scalar_one_or_none()
+            if expired:
+                await db.execute(
+                    delete(IdempotencyKey).where(
+                        IdempotencyKey.user_id == user.id,
+                        IdempotencyKey.key_hash == key_hash,
+                    )
+                )
+                await db.commit()
             idem_result = await db.execute(
                 select(IdempotencyKey).where(
                     IdempotencyKey.user_id == user.id,
@@ -164,6 +188,8 @@ async def ingest(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database integrity error",
         ) from exc
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
         await db.rollback()
         raise

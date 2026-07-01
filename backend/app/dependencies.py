@@ -213,7 +213,7 @@ async def get_current_user_or_api_key(
 
 async def rate_limit_dependency(
     request: Request,
-    user: User = Depends(get_current_user_or_api_key),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     route_obj = request.scope.get("route")
     if route_obj and getattr(route_obj, "name", None):
@@ -221,18 +221,35 @@ async def rate_limit_dependency(
     else:
         path = re.sub(r"/\d+", "/{id}", request.url.path)
         route = f"{request.method}:{path}"
-    limit = RATE_LIMITS.get(user.tier, 10)
-    # Check if an API key is in use and has a custom limit
-    api_key = getattr(request.state, "api_key", None)
-    if api_key:
-        limit = api_key.rate_limit_per_min
 
-    identifier = str(user.id)
+    # Apply rate limiting before auth. Use cached user if available from a prior
+    # dependency; otherwise fall back to IP-based rate limiting.
+    user = getattr(request.state, "_cached_user", None)
+    if user is not None:
+        limit = RATE_LIMITS.get(user.tier, 10)
+        # Check if an API key is in use and has a custom limit
+        api_key = getattr(request.state, "api_key", None)
+        if api_key:
+            limit = api_key.rate_limit_per_min
+        identifier = str(user.id)
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        identifier = f"ip:{client_ip}"
+        limit = RATE_LIMITS.get("free", 10)
+
     if not await check_rate_limit(identifier, route, limit):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded",
         )
+
+    # Perform auth if not already cached
+    if user is None:
+        user = await get_current_user_or_api_key(request, x_api_key=None, db=db)
+
     return user
 
 
