@@ -6,6 +6,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.database import get_engine, Base
+from app.dependencies import _rate_limit_store
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -13,6 +14,7 @@ async def reset_db():
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+    _rate_limit_store.clear()
     yield
 
 

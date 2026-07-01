@@ -126,7 +126,7 @@ async def query_data(
         stmt = stmt.where(SensorReading.timestamp <= end)
 
     # Count total for pagination
-    count_stmt = stmt.with_only_columns(func.count(SensorReading.id), maintain_order_from=False)
+    count_stmt = stmt.with_only_columns(func.count(SensorReading.id))
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one() or 0
 

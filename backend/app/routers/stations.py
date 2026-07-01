@@ -76,7 +76,7 @@ async def list_stations(
     if status_filter:
         stmt = stmt.where(SensorStation.status == status_filter)
 
-    count_stmt = stmt.with_only_columns(func.count(SensorStation.id), maintain_order_from=False)
+    count_stmt = stmt.with_only_columns(func.count(SensorStation.id))
     count_result = await db.execute(count_stmt)
     total = count_result.scalar_one() or 0
 
