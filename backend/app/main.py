@@ -35,6 +35,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "PRODUCTION: Skipping Base.metadata.create_all. "
             "Run 'alembic upgrade head' in your Docker entrypoint."
         )
+
+    # Cleanup stale revoked tokens and rate limit entries on startup
+    try:
+        from app.auth import cleanup_revoked_tokens
+        from app.dependencies import cleanup_rate_limit_entries
+        await cleanup_revoked_tokens()
+        await cleanup_rate_limit_entries()
+    except Exception:
+        logger.warning("Cleanup failed during startup", exc_info=True)
+
     yield
     logger.info("Shutting down ENViroSwarm API...")
     await get_engine().dispose()

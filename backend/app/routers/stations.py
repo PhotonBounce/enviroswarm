@@ -78,7 +78,7 @@ async def list_stations(
 
     count_stmt = stmt.with_only_columns(func.count(SensorStation.id))
     count_result = await db.execute(count_stmt)
-    total = count_result.scalar_one() or 0
+    total = count_result.scalar_one()
 
     stmt = stmt.order_by(SensorStation.created_at.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)
@@ -136,10 +136,8 @@ async def update_station(
 
     if body.name is not None:
         station.name = body.name
-    if body.latitude is not None:
-        station.latitude = body.latitude
-    if body.longitude is not None:
-        station.longitude = body.longitude
+    station.latitude = body.latitude
+    station.longitude = body.longitude
     if body.sensor_types is not None:
         station.sensor_types = body.sensor_types
     if body.status is not None:

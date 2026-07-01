@@ -1,6 +1,7 @@
 """Billing / subscription router."""
 
 from datetime import datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -67,7 +68,7 @@ async def subscribe(
         )
 
     # Lock user row to prevent race condition on duplicate active subscriptions.
-    # TODO: Consider adding a unique partial index on (user_id, deleted_at) where end_date >= now.
+    # TODO: Add DB migration: CREATE UNIQUE INDEX uq_active_subscription ON subscriptions(user_id) WHERE deleted_at IS NULL AND end_date >= NOW()
     await db.execute(select(User).where(User.id == user.id).with_for_update())
 
     # Check for existing active subscription
@@ -87,9 +88,7 @@ async def subscribe(
         )
 
     start_date = now
-    # NOTE: Uses a 30-day approximation for month duration. For true calendar-month
-    # billing, use dateutil.relativedelta or compute month arithmetic manually.
-    end_date = start_date + timedelta(days=30 * body.duration_months)
+    end_date = start_date + relativedelta(months=body.duration_months)
 
     sub = Subscription(
         user_id=user.id,
@@ -105,12 +104,12 @@ async def subscribe(
     try:
         await db.commit()
         await db.refresh(sub)
-    except Exception:
+    except Exception as exc:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create subscription",
-        )
+        ) from exc
 
     return StandardResponse(
         data=SubscriptionResponse.model_validate(sub).model_dump(mode="json")

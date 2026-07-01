@@ -59,7 +59,7 @@ async def query_data(
             end = end.replace(tzinfo=timezone.utc)
 
     if start and end and start > end:
-        raise HTTPException(status_code=400, detail="start cannot be after end")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start cannot be after end")
 
     if aggregate and aggregate != "none":
         # NOTE: Aggregation uses date_trunc, which is PostgreSQL-specific.
@@ -69,7 +69,7 @@ async def query_data(
 
         stmt = (
             select(
-                func.date_trunc(trunc_unit, SensorReading.timestamp).label("bucket"),
+                _date_trunc(trunc_unit, SensorReading.timestamp).label("bucket"),
                 func.avg(SensorReading.value).label("avg_value"),
                 func.min(SensorReading.value).label("min_value"),
                 func.max(SensorReading.value).label("max_value"),
@@ -83,7 +83,7 @@ async def query_data(
             .where(SensorReading.deleted_at.is_(None))
             .where(SensorReading.timestamp >= effective_start)
             .group_by(
-                func.date_trunc(trunc_unit, SensorReading.timestamp),
+                _date_trunc(trunc_unit, SensorReading.timestamp),
                 SensorReading.sensor_type,
                 SensorReading.unit,
             )

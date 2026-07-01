@@ -4,7 +4,7 @@ import asyncio
 import hmac
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Header, Request, status
@@ -48,7 +48,14 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
             await session.commit()
             return True
 
-        if now - entry.window_start >= window:
+        # SQLite may return naive datetimes; normalize for comparison
+        entry_window = entry.window_start
+        if entry_window.tzinfo is None and now.tzinfo is not None:
+            compare_now = now.replace(tzinfo=None)
+        else:
+            compare_now = now
+
+        if compare_now - entry_window >= window:
             entry.count = 1
             entry.window_start = now
             await session.commit()

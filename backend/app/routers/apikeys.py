@@ -88,6 +88,7 @@ async def list_api_keys(
 ) -> StandardResponse:
     result = await db.execute(
         select(ApiKey).where(ApiKey.user_id == user.id, ApiKey.deleted_at.is_(None))
+        .order_by(ApiKey.created_at.desc())
     )
     keys = result.scalars().all()
     return StandardResponse(

@@ -186,7 +186,7 @@ async def _get_user_from_token(token: str, db: AsyncSession) -> User:
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
-    request: Optional[Request] = None,
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Authenticate user from JWT in Authorization header OR httpOnly cookie."""

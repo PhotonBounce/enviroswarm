@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user_or_api_key, rate_limit_dependency
+from app.dependencies import get_current_user_or_api_key, rate_limit_dependency, require_permission
 from app.models import SensorReading, SensorStation, User, IdempotencyKey
 from app.schemas import StandardResponse, IngestRequest, IngestResponse
 from app.constants import RETENTION_DAYS, READING_TIER_LIMITS, IDEMPOTENCY_TTL_SECONDS
@@ -23,16 +23,9 @@ async def ingest(
     request: Request,
     body: IngestRequest,
     user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    # API key permission check
-    api_key = getattr(request.state, "api_key", None)
-    if api_key and not api_key.permissions.get("write", False):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="API key does not have write permission",
-        )
-
     # Idempotency check — transactional via DB
     idempotency_key = request.headers.get("X-Idempotency-Key")
     if idempotency_key and len(idempotency_key) > 256:
@@ -111,7 +104,7 @@ async def ingest(
                 SensorReading.timestamp >= today_start,
             )
         )
-        today_count = count_result.scalar_one() or 0
+        today_count = count_result.scalar_one()
 
         tier_limits = READING_TIER_LIMITS
         if today_count + len(body.readings) > tier_limits.get(user.tier, 100):
