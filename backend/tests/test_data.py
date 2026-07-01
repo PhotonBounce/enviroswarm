@@ -56,7 +56,7 @@ async def data_client(auth_client: AsyncClient):
                 "sensor_type": "temperature",
                 "value": 22.5,
                 "unit": "C",
-                "timestamp": now.isoformat(),
+                "timestamp": now.isoformat().replace("+00:00", "Z"),
                 "metadata": {"source": "test"}
             }
         ]
@@ -85,8 +85,8 @@ async def test_query_data_with_sensor_type(data_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_query_data_start_end(data_client: AsyncClient):
     now = datetime.now(timezone.utc)
-    start = (now - timedelta(hours=1)).isoformat()
-    end = (now + timedelta(hours=1)).isoformat()
+    start = (now - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    end = (now + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
     r = await data_client.get(f"/api/v1/data?start={start}&end={end}")
     assert r.status_code == 200
 
@@ -94,8 +94,8 @@ async def test_query_data_start_end(data_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_query_data_start_after_end(data_client: AsyncClient):
     now = datetime.now(timezone.utc)
-    start = (now + timedelta(days=1)).isoformat()
-    end = (now - timedelta(days=1)).isoformat()
+    start = (now + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+    end = (now - timedelta(days=1)).isoformat().replace("+00:00", "Z")
     r = await data_client.get(f"/api/v1/data?start={start}&end={end}")
     assert r.status_code == 400
 
