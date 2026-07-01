@@ -4,11 +4,12 @@ from functools import lru_cache
 from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 _engine = None
 _AsyncSessionLocal = None

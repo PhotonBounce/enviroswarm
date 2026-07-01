@@ -67,11 +67,17 @@ async def register(
             detail="Too many registration attempts",
         )
 
-    # Check duplicate email
+    # Check duplicate email (including soft-deleted)
     result = await db.execute(
-        select(User).where(User.email == body.email, User.deleted_at.is_(None))
+        select(User).where(User.email == body.email)
     )
-    if result.scalar_one_or_none():
+    existing = result.scalar_one_or_none()
+    if existing:
+        if existing.deleted_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Account exists but was deleted. Contact support to restore.",
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )

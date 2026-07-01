@@ -36,12 +36,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "Run 'alembic upgrade head' in your Docker entrypoint."
         )
 
-    # Cleanup stale revoked tokens and rate limit entries on startup
+    # Cleanup stale revoked tokens, rate limit entries, and idempotency keys on startup
     try:
         from app.auth import cleanup_revoked_tokens
-        from app.dependencies import cleanup_rate_limit_entries
+        from app.dependencies import cleanup_rate_limit_entries, cleanup_idempotency_keys
         await cleanup_revoked_tokens()
         await cleanup_rate_limit_entries()
+        await cleanup_idempotency_keys()
     except Exception:
         logger.warning("Cleanup failed during startup", exc_info=True)
 
@@ -64,7 +65,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Idempotency-Key"],
 )
 

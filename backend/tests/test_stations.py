@@ -125,6 +125,25 @@ async def test_update_station(auth_client: AsyncClient):
     assert r.status_code == 200
     data = r.json()
     assert data["data"]["name"] == "Updated Name"
+    assert data["data"]["latitude"] == 40.0
+    assert data["data"]["longitude"] == -74.0
+
+
+@pytest.mark.asyncio
+async def test_update_station_partial_coordinates_rejected(auth_client: AsyncClient):
+    create_r = await auth_client.post("/api/v1/stations", json={
+        "name": "Update Station",
+        "latitude": 40.0,
+        "longitude": -74.0,
+        "sensor_types": ["temperature"],
+        "status": "active"
+    })
+    station_id = create_r.json()["data"]["id"]
+
+    r = await auth_client.patch(f"/api/v1/stations/{station_id}", json={
+        "latitude": None
+    })
+    assert r.status_code == 422
 
 
 @pytest.mark.asyncio

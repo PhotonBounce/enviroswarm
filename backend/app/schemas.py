@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Shared
@@ -68,8 +68,7 @@ class UserResponse(BaseModel):
     is_verified: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
 # Sensor Stations
@@ -108,15 +107,11 @@ class StationUpdateRequest(BaseModel):
             raise ValueError(f"Invalid status: {v}. Must be one of: active, inactive, maintenance")
         return v
 
-    @field_validator("longitude", mode="after")
-    @classmethod
-    def validate_latitude_longitude(cls, v: Optional[float], info) -> Optional[float]:
-        data = info.data
-        lat = data.get("latitude")
-        lon = v
-        if (lat is not None) != (lon is not None):
-            raise ValueError("latitude and longitude must both be set or both be omitted")
-        return v
+    @model_validator(mode="after")
+    def validate_latitude_longitude(self) -> "StationUpdateRequest":
+        if (self.latitude is not None) != (self.longitude is not None):
+            raise ValueError("latitude and longitude must both be set or both be null")
+        return self
 
 
 class StationCreateRequest(BaseModel):
@@ -168,8 +163,7 @@ class StationResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
 # Ingest
@@ -233,8 +227,7 @@ class DataQueryResponse(BaseModel):
     timestamp: datetime
     reading_metadata: Optional[Dict[str, Any]] = Field(default=None, serialization_alias="metadata")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class NearbyStationResponse(BaseModel):
     id: UUID
@@ -244,8 +237,7 @@ class NearbyStationResponse(BaseModel):
     sensor_types: List[str]
     distance_km: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
 # API Keys
@@ -276,8 +268,7 @@ class ApiKeyCreateResponse(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ApiKeyResponse(BaseModel):
     id: UUID
@@ -288,8 +279,7 @@ class ApiKeyResponse(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ---------------------------------------------------------------------------
 # Billing / Subscription
@@ -317,5 +307,4 @@ class SubscriptionResponse(BaseModel):
     payment_status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

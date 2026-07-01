@@ -6,12 +6,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import re
 from fastapi import Depends, HTTPException, Header, Request, status
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, get_sessionmaker
-from app.models import ApiKey, RateLimitEntry, User
+from app.models import ApiKey, IdempotencyKey, RateLimitEntry, User
 from app.auth import decode_access_token
 from app.utils.crypto import hash_key, extract_prefix
 from app.constants import RATE_LIMITS
@@ -39,8 +41,17 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
 
         if entry is None:
             session.add(RateLimitEntry(key=key, count=1, window_start=now))
-            await session.commit()
-            return True
+            try:
+                await session.commit()
+                return True
+            except IntegrityError:
+                await session.rollback()
+                result = await session.execute(
+                    select(RateLimitEntry).where(RateLimitEntry.key == key).with_for_update()
+                )
+                entry = result.scalar_one_or_none()
+                if entry is None:
+                    raise
 
         # SQLite may return naive datetimes; normalize for comparison
         entry_window = entry.window_start
@@ -74,11 +85,21 @@ async def cleanup_rate_limit_entries() -> None:
         await session.commit()
 
 
+async def cleanup_idempotency_keys() -> None:
+    """Delete expired idempotency keys."""
+    async with get_sessionmaker()() as session:
+        from sqlalchemy import delete
+        await session.execute(
+            delete(IdempotencyKey).where(IdempotencyKey.expires_at < datetime.now(timezone.utc))
+        )
+        await session.commit()
+
+
 # ---------------------------------------------------------------------------
 # API key extraction
 # ---------------------------------------------------------------------------
 
-def extract_api_key(request: Request, x_api_key: Optional[str] = Header(None)) -> Optional[str]:
+def extract_api_key(request: Request, x_api_key: Optional[str] = None) -> Optional[str]:
     if x_api_key:
         return x_api_key
     auth = request.headers.get("Authorization", "")
@@ -194,7 +215,12 @@ async def rate_limit_dependency(
     request: Request,
     user: User = Depends(get_current_user_or_api_key),
 ) -> User:
-    route = f"{request.method}:{request.url.path}"
+    route_obj = request.scope.get("route")
+    if route_obj and getattr(route_obj, "name", None):
+        route = f"{request.method}:{route_obj.name}"
+    else:
+        path = re.sub(r"/\d+", "/{id}", request.url.path)
+        route = f"{request.method}:{path}"
     limit = RATE_LIMITS.get(user.tier, 10)
     # Check if an API key is in use and has a custom limit
     api_key = getattr(request.state, "api_key", None)

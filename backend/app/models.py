@@ -28,7 +28,7 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     tier: Mapped[str] = mapped_column(
         String(20), default="free", nullable=False
@@ -57,6 +57,7 @@ class User(Base):
 
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_user_tier"),
+        UniqueConstraint("email", postgresql_where=(deleted_at.is_(None)), name="uq_users_email"),
     )
 
 
@@ -258,4 +259,5 @@ class IdempotencyKey(Base):
     __table_args__ = (
         CheckConstraint("expires_at >= created_at", name="ck_idempotency_expires_after_created"),
         UniqueConstraint("user_id", "key_hash", name="uq_idempotency_user_key"),
+        Index("ix_idempotency_keys_expires_at", "expires_at"),
     )
