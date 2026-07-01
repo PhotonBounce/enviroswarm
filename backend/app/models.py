@@ -205,6 +205,7 @@ class Subscription(Base):
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_sub_tier"),
         CheckConstraint("payment_status IN ('pending', 'active', 'failed', 'cancelled', 'completed')", name="ck_sub_payment_status"),
+        CheckConstraint("end_date >= start_date", name="ck_sub_end_after_start"),
         Index("ix_subscriptions_user_deleted_end", "user_id", "deleted_at", "end_date"),
     )
 
