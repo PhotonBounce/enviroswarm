@@ -38,6 +38,7 @@ export default function Dashboard() {
     if (todayResponse?.readings && todayResponse.readings.length > 0) {
       const sorted = [...todayResponse.readings].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 4)
       return sorted.map((reading) => ({
+        id: reading.id,
         title: `${capitalize(reading.sensor_type)}: ${typeof reading.value === 'number' ? reading.value.toFixed(2) : reading.value} ${reading.unit}`,
         time: formatDate(reading.timestamp),
         type: 'reading' as const,
@@ -46,6 +47,7 @@ export default function Dashboard() {
     if (!stations || stations.length === 0) return []
     const sorted = [...stations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 4)
     return sorted.map((station) => ({
+      id: station.id,
       title: `Station "${station.name}" created`,
       time: formatDate(station.created_at),
       type: 'station' as const,
@@ -131,8 +133,8 @@ export default function Dashboard() {
               <div className="text-center text-muted-foreground py-8">Loading activity...</div>
             ) : recentActivity.length > 0 ? (
               <div className="space-y-4">
-                {recentActivity.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3">
+                {recentActivity.map((item) => (
+                  <div key={item.id} className="flex items-start gap-3">
                     <div className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{item.title}</p>

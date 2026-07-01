@@ -148,6 +148,7 @@ export default function Stations() {
                     key={type}
                     type="button"
                     onClick={() => toggleSensor(type)}
+                    aria-pressed={selectedSensors.includes(type)}
                     className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
                       selectedSensors.includes(type)
                         ? 'border-emerald-600 bg-emerald-900/30 text-emerald-400'

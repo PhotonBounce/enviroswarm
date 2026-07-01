@@ -33,8 +33,6 @@ from generators.reading_generator import generate_all_readings
 API_BASE = "http://localhost:8000"
 DEMO_EMAIL = os.getenv("DEMO_EMAIL", "demo@enviroswarm.local")
 DEMO_PASSWORD = os.getenv("DEMO_PASSWORD")
-if not DEMO_PASSWORD:
-    raise ValueError("DEMO_PASSWORD environment variable is required")
 DEMO_TIER = os.getenv("DEMO_TIER", "enterprise")
 
 TOTAL_STATIONS = 30
@@ -504,7 +502,7 @@ def run_seed(
                 summary["batches_sent"] += 1
                 inserted = result.get("inserted", "?")
                 print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
-            except requests.RequestException as e:
+            except (requests.RequestException, RuntimeError) as e:
                 summary["api_errors"] += 1
                 sample = json.dumps({"readings": batch[:2]})[:500]
                 print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
@@ -634,7 +632,7 @@ def main():
         "--password",
         type=str,
         default=DEMO_PASSWORD,
-        help=f"Demo user password (default: {DEMO_PASSWORD})",
+        help="Demo user password (default: ***hidden*** or DEMO_PASSWORD env var)",
     )
     parser.add_argument(
         "--tier",
@@ -655,6 +653,10 @@ def main():
     )
     args = parser.parse_args()
 
+    if not args.password:
+        raise ValueError("DEMO_PASSWORD environment variable is required (or use --password)")
+    if args.duration_months < 1:
+        raise ValueError("duration_months must be >= 1")
     if args.stations <= 0:
         raise ValueError("stations must be > 0")
     if args.days < 0:

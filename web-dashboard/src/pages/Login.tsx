@@ -60,6 +60,7 @@ export default function Login() {
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 className="pl-9"
+                autoComplete="email"
                 required
               />
             </div>
@@ -75,6 +76,7 @@ export default function Login() {
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 className="pl-9"
+                autoComplete="current-password"
                 required
               />
             </div>

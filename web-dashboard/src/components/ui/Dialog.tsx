@@ -1,5 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useId, createContext, useContext } from 'react'
 import { cn } from '@/lib/utils'
+
+const DialogContext = createContext<{ titleId: string; descriptionId: string } | null>(null)
 
 interface DialogProps {
   open: boolean
@@ -10,6 +12,8 @@ interface DialogProps {
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
+  const titleId = useId()
+  const descriptionId = useId()
 
   useEffect(() => {
     if (open) {
@@ -67,16 +71,20 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
-      <div
-        ref={contentRef}
-        role="dialog"
-        aria-modal="true"
-        tabIndex={-1}
-        className="relative z-50 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-card p-6 text-card-foreground shadow-lg"
-        onKeyDown={handleKeyDown}
-      >
-        {children}
-      </div>
+      <DialogContext.Provider value={{ titleId, descriptionId }}>
+        <div
+          ref={contentRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
+          className="relative z-50 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-card p-6 text-card-foreground shadow-lg"
+          onKeyDown={handleKeyDown}
+        >
+          {children}
+        </div>
+      </DialogContext.Provider>
     </div>
   )
 }
@@ -90,16 +98,18 @@ export function DialogHeader({ className, children, ...props }: React.HTMLAttrib
 }
 
 export function DialogTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+  const ctx = useContext(DialogContext)
   return (
-    <h2 className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props}>
+    <h2 id={ctx?.titleId} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props}>
       {children}
     </h2>
   )
 }
 
 export function DialogDescription({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  const ctx = useContext(DialogContext)
   return (
-    <p className={cn('text-sm text-muted-foreground', className)} {...props}>
+    <p id={ctx?.descriptionId} className={cn('text-sm text-muted-foreground', className)} {...props}>
       {children}
     </p>
   )

@@ -38,6 +38,10 @@ export default function Header() {
   useEffect(() => {
     if (!mobileOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false)
+        return
+      }
       if (e.key !== 'Tab') return
       const focusable = mobileMenuRef.current?.querySelectorAll<HTMLElement>('a[href], button')
       if (!focusable || focusable.length === 0) return
@@ -67,6 +71,7 @@ export default function Header() {
             className="md:hidden rounded-lg p-2 hover:bg-muted"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle mobile menu"
+            aria-expanded={mobileOpen}
           >
             <Menu className="h-5 w-5" />
           </button>

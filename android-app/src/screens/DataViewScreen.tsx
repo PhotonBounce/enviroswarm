@@ -85,7 +85,7 @@ export default function DataViewScreen({ route }: Props) {
       const items = groupedByType[type]?.slice(-20) || [];
       if (items.length < 2) return null;
       return {
-        labels: items.map((_, i) => String(i + 1)),
+        labels: items.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
         datasets: [
           {
             data: items.map((r) => r.value),

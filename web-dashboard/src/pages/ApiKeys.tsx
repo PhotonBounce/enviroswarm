@@ -128,10 +128,10 @@ export default function ApiKeys() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleCopy(key.key_hash, key.id)}>
+                  <Button variant="ghost" size="icon" aria-label="Copy API key" onClick={() => handleCopy(key.key_hash, key.id)}>
                     {copiedId === key.id ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDelete(key.id)}>
+                  <Button variant="ghost" size="icon" aria-label="Delete API key" onClick={() => handleDelete(key.id)}>
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </Button>
                 </div>

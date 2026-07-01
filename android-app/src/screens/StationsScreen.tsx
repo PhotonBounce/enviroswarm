@@ -73,7 +73,7 @@ export default function StationsScreen({ navigation }: Props) {
   };
 
   const createStation = async () => {
-    if (!name || selectedTypes.length === 0) {
+    if (!name.trim() || selectedTypes.length === 0) {
       Alert.alert('Validation', 'Name and at least one sensor type required');
       return;
     }

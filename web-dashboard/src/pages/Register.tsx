@@ -65,6 +65,7 @@ export default function Register() {
                 value={email}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                 className="pl-9"
+                autoComplete="email"
                 required
               />
             </div>
@@ -80,6 +81,7 @@ export default function Register() {
                 value={password}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                 className="pl-9"
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -95,6 +97,7 @@ export default function Register() {
                 value={confirmPassword}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
                 className="pl-9"
+                autoComplete="new-password"
                 required
               />
             </div>

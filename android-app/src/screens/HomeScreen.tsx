@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  Dimensions,
   TouchableOpacity,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Region } from 'react-native-maps';
@@ -20,9 +20,8 @@ interface Props {
   navigation: NativeStackNavigationProp<any>;
 }
 
-const { width, height } = Dimensions.get('window');
-
 export default function HomeScreen({ navigation }: Props) {
+  const { width, height } = useWindowDimensions();
   const { latitude, longitude, loading: locLoading, error: locError, getCurrentLocation } = useLocation();
   const [stations, setStations] = useState<SensorStation[]>([]);
   const [loading, setLoading] = useState(false);
