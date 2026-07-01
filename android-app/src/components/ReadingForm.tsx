@@ -45,13 +45,19 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
       Alert.alert('Invalid Input', 'Please enter a valid numeric value.');
       return;
     }
+    const numLat = lat !== '' ? parseFloat(lat) : undefined;
+    const numLon = lon !== '' ? parseFloat(lon) : undefined;
+    if ((numLat !== undefined && isNaN(numLat)) || (numLon !== undefined && isNaN(numLon))) {
+      Alert.alert('Invalid Input', 'Please enter valid coordinates.');
+      return;
+    }
     onSubmit({
       station_id: stationId,
       sensor_type: sensorType,
       value: numValue,
       unit: SENSOR_UNITS[sensorType],
-      lat: lat !== '' ? parseFloat(lat) : undefined,
-      lon: lon !== '' ? parseFloat(lon) : undefined,
+      lat: numLat,
+      lon: numLon,
     });
   };
 

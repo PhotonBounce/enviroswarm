@@ -34,9 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (response.data?.success) {
           setUserState(response.data.data)
         }
-      } catch {
-        // Not authenticated — cookie missing or expired
-        setUserState(null)
+      } catch (err: any) {
+        if (err?.response?.status === 401) {
+          setUserState(null)
+        }
       } finally {
         setIsLoading(false)
       }

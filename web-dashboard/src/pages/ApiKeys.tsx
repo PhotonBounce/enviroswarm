@@ -22,6 +22,7 @@ export default function ApiKeys() {
   const [newKey, setNewKey] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [createError, setCreateError] = useState('')
 
   const canManageKeys = tier === 'pro' || tier === 'enterprise'
 
@@ -29,14 +30,16 @@ export default function ApiKeys() {
     e.preventDefault()
     if (!keyName.trim()) return
     setToast(null)
+    setCreateError('')
     try {
       const result = await createApiKey.mutateAsync(keyName.trim())
       // result.raw_key contains the one-time raw API key from the backend.
       // This is intentionally distinct from key_hash (the hash shown in listings).
       setNewKey(result.raw_key)
       setKeyName('')
-    } catch {
-      // error handled by mutation
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create API key'
+      setCreateError(message)
     }
   }
 
@@ -173,6 +176,7 @@ export default function ApiKeys() {
             </div>
           ) : (
             <form onSubmit={handleCreate} className="space-y-4">
+              {createError && <p className="text-sm text-red-400">{createError}</p>}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Key Name</label>
                 <Input value={keyName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeyName(e.target.value)} placeholder="e.g. Production App" required />

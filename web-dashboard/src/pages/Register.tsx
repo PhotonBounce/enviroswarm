@@ -23,7 +23,7 @@ export default function Register() {
       return
     }
     try {
-      await registerMutation.mutateAsync({ email, password })
+      await registerMutation.mutateAsync({ email: email.trim(), password })
       // Cookie is set by backend (httpOnly). Browser sends it automatically.
       // Fetch user profile.
       try {

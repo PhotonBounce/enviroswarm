@@ -52,7 +52,7 @@ export default function RegisterScreen({ navigation }: Props) {
     }
     setLoading(true);
     try {
-      await register(email, password);
+      await register(email.trim(), password);
     } catch (err: any) {
       Alert.alert('Registration Failed', err?.message || 'Please try again');
     } finally {

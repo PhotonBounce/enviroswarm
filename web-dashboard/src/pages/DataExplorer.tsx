@@ -56,6 +56,10 @@ export default function DataExplorer() {
         params.end = endDate.toISOString()
       }
     }
+    if (params.start && params.end && new Date(params.start) > new Date(params.end)) {
+      alert('Start date must be before end date')
+      return
+    }
     setPage(1)
     setQueryParams(params)
   }
@@ -83,7 +87,7 @@ export default function DataExplorer() {
       String(r.value),
       r.unit,
     ])
-    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n')
+    const csv = [headers.join(','), ...rows.map((row) => row.map((value) => String(value).includes(',') ? `"${value}"` : value).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

@@ -37,9 +37,9 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
-      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
-      <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" />}>
+      <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
+      <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} />
+      <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/stations" element={<Stations />} />
         <Route path="/data" element={<DataExplorer />} />

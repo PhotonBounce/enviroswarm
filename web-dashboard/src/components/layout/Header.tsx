@@ -20,6 +20,7 @@ export default function Header() {
   const location = useLocation()
   const notificationRef = useRef<HTMLDivElement>(null)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
+  const hamburgerRef = useRef<HTMLButtonElement>(null)
 
   const notificationCount = 0
 
@@ -51,7 +52,10 @@ export default function Header() {
       }
     }
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      hamburgerRef.current?.focus()
+    }
   }, [mobileOpen])
 
   return (
@@ -59,6 +63,7 @@ export default function Header() {
       <div className="flex h-16 items-center justify-between px-4 md:pl-72">
         <div className="flex items-center gap-4">
           <button
+            ref={hamburgerRef}
             className="md:hidden rounded-lg p-2 hover:bg-muted"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle mobile menu"
