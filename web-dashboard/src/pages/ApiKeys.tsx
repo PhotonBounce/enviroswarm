@@ -65,7 +65,8 @@ export default function ApiKeys() {
     try {
       await navigator.clipboard.writeText(key)
       setCopiedId(id)
-      setTimeout(() => setCopiedId(null), 2000)
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000)
     } catch {
       setToast({ type: 'error', message: 'Clipboard access denied. Please copy manually.' })
     }
