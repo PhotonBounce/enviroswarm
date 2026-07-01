@@ -18,8 +18,8 @@ router = APIRouter(prefix="/stations", tags=["stations"])
 @router.post("", response_model=StandardResponse)
 async def create_station(
     body: StationCreateRequest,
-    user: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Tier limits — lock user row to prevent race condition
@@ -63,8 +63,8 @@ async def create_station(
 
 @router.get("", response_model=StandardResponse)
 async def list_stations(
-    user: User = Depends(require_permission("read")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
@@ -92,8 +92,8 @@ async def list_stations(
 @router.get("/{station_id}", response_model=StandardResponse)
 async def get_station(
     station_id: UUID,
-    user: User = Depends(require_permission("read")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -117,8 +117,8 @@ async def get_station(
 async def update_station(
     station_id: UUID,
     body: StationUpdateRequest,
-    user: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -154,8 +154,8 @@ async def update_station(
 @router.delete("/{station_id}", response_model=StandardResponse)
 async def delete_station(
     station_id: UUID,
-    user: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(

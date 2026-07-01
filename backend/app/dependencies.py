@@ -143,7 +143,7 @@ async def get_current_user_or_api_key(
             if hmac.compare_digest(api_key.key_hash, key_hash):
                 if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
                     raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
+                        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired API key"
                     )
                 # Update last_used_at in a separate session to avoid committing shared session
                 try:
@@ -166,14 +166,14 @@ async def get_current_user_or_api_key(
                 user = user_result.scalar_one_or_none()
                 if user is None:
                     raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED, detail="API key owner not found or inactive"
+                        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired API key"
                     )
                 # Attach rate limit info for dependency use later
                 request.state.api_key = api_key
                 request.state._cached_user = user
                 return user
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired API key"
         )
 
     # Fall back to JWT
@@ -234,9 +234,17 @@ async def rate_limit_dependency(
         identifier = str(user.id)
     else:
         client_ip = request.client.host if request.client else "unknown"
+    # Only trust X-Forwarded-For if the direct client is a private/local IP
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
+            from ipaddress import ip_address
+            try:
+                addr = ip_address(client_ip)
+                if addr.is_private or addr.is_loopback:
+                    # Use the last IP in the chain (closest to the app server)
+                    client_ip = forwarded.split(",")[-1].strip()
+            except ValueError:
+                pass
         identifier = f"ip:{client_ip}"
         limit = RATE_LIMITS.get("free", 10)
 
@@ -244,6 +252,7 @@ async def rate_limit_dependency(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded",
+            headers={"Retry-After": "60"},
         )
 
     # Perform auth if not already cached

@@ -77,6 +77,7 @@ async def test_refresh_token(client: AsyncClient):
         "email": "refresh@example.com",
         "password": "Password123"
     })
+    old_access_token = r.json()["data"]["access_token"]
     refresh_token = r.json()["data"]["refresh_token"]
 
     # Refresh
@@ -87,7 +88,7 @@ async def test_refresh_token(client: AsyncClient):
     data = r.json()
     assert data["success"] is True
     assert "access_token" in data["data"]
-    assert data["data"]["access_token"] != refresh_token
+    assert data["data"]["access_token"] != old_access_token
 
 
 @pytest.mark.asyncio

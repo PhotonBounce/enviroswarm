@@ -57,13 +57,32 @@ REFRESH_COOKIE_SETTINGS = {
 }
 
 
-@router.post("/register", response_model=StandardResponse)
+@router.post("/register", response_model=StandardResponse, status_code=status.HTTP_201_CREATED)
 async def register(
+    request: Request,
     body: UserRegisterRequest, db: AsyncSession = Depends(get_db)
 ) -> StandardResponse:
     # Normalize email for case-insensitive comparison.
     # NOTE: A migration should add a functional unique index on lower(email) to enforce case-insensitive uniqueness.
     body.email = body.email.lower().strip()
+
+    # Rate limit registration by IP to prevent mass account creation
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        from ipaddress import ip_address
+        try:
+            addr = ip_address(client_ip)
+            if addr.is_private or addr.is_loopback:
+                client_ip = forwarded.split(",")[-1].strip()
+        except ValueError:
+            pass
+
+    if not await check_rate_limit(f"register:global:{client_ip}", "/auth/register", 3):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many registration attempts",
+        )
 
     # Rate limit registration by email
     if not await check_rate_limit(f"register:{body.email}", "/auth/register", 3):
@@ -78,11 +97,6 @@ async def register(
     )
     existing = result.scalar_one_or_none()
     if existing:
-        if existing.deleted_at is not None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Account exists but was deleted. Contact support to restore.",
-            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
@@ -165,10 +179,18 @@ async def login(
 @router.post("/refresh", response_model=StandardResponse)
 async def refresh_token(
     body: RefreshTokenRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    payload = await decode_refresh_token(body.refresh_token)
+    refresh_token_str = body.refresh_token or request.cookies.get("refresh_token")
+    if not refresh_token_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required",
+        )
+
+    payload = await decode_refresh_token(refresh_token_str)
 
     # Rate limit refresh by user_id
     user_id = payload.get("sub")

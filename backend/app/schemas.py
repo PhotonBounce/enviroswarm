@@ -255,6 +255,16 @@ class ApiKeyCreateRequest(BaseModel):
     permissions: Optional[Dict[str, bool]] = None
     expires_at: Optional[datetime] = None
 
+    @field_validator("permissions", mode="before")
+    @classmethod
+    def validate_permissions(cls, v: Optional[Dict[str, bool]]) -> Optional[Dict[str, bool]]:
+        if v is None:
+            return v
+        invalid = [k for k in v if k not in {"read", "write"}]
+        if invalid:
+            raise ValueError(f"Invalid permissions: {invalid}. Only 'read' and 'write' are allowed")
+        return v
+
     @field_validator("expires_at", mode="after")
     @classmethod
     def validate_expires_at(cls, v: Optional[datetime]) -> Optional[datetime]:

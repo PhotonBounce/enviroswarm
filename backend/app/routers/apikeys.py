@@ -29,9 +29,9 @@ def _generate_api_key() -> str:
 @router.post("", response_model=StandardResponse)
 async def create_api_key(
     body: ApiKeyCreateRequest,
-    user: User = Depends(require_tier("pro", "enterprise")),
+    user: User = Depends(rate_limit_dependency),
+    _tier: User = Depends(require_tier("pro", "enterprise")),
     _perm: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Lock user row to prevent race condition on tier limit
@@ -82,8 +82,8 @@ async def create_api_key(
 
 @router.get("", response_model=StandardResponse)
 async def list_api_keys(
-    user: User = Depends(require_permission("read")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(
@@ -99,8 +99,8 @@ async def list_api_keys(
 @router.delete("/{key_id}", response_model=StandardResponse)
 async def revoke_api_key(
     key_id: UUID,
-    user: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     result = await db.execute(

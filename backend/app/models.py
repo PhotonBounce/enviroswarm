@@ -173,6 +173,7 @@ class ApiKey(Base):
 
     __table_args__ = (
         CheckConstraint("rate_limit_per_min > 0", name="ck_apikey_rate_limit"),
+        Index("ix_apikeys_user_deleted", "user_id", "deleted_at"),
     )
 
 
@@ -204,6 +205,7 @@ class Subscription(Base):
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_sub_tier"),
         CheckConstraint("payment_status IN ('pending', 'active', 'failed', 'cancelled')", name="ck_sub_payment_status"),
+        Index("ix_subscriptions_user_deleted_end", "user_id", "deleted_at", "end_date"),
     )
 
 

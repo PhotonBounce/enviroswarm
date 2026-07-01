@@ -58,8 +58,8 @@ async def get_pricing() -> StandardResponse:
 @router.post("/subscribe", response_model=StandardResponse)
 async def subscribe(
     body: SubscriptionRequest,
-    user: User = Depends(require_permission("write")),
-    _rate_limited: User = Depends(rate_limit_dependency),
+    user: User = Depends(rate_limit_dependency),
+    _authorized: User = Depends(require_permission("write")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     tier_names = {t.name for t in PRICING_TIERS}
@@ -106,6 +106,16 @@ async def subscribe(
         payment_status="pending",
     )
     db.add(sub)
+
+    # TODO: Integrate with payment processor (Stripe, etc.) before upgrading tier.
+    # Only upgrade tier when payment_status is "completed".
+    if sub.payment_status != "completed":
+        await db.commit()
+        await db.refresh(sub)
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Payment required",
+        )
 
     # Update user tier
     user.tier = body.tier
