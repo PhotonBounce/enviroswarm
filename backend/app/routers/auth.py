@@ -303,7 +303,7 @@ async def logout(
 
 
 @router.get("/me", response_model=StandardResponse)
-async def me(user: User = Depends(get_current_user)) -> StandardResponse:
+async def me(user: User = Depends(rate_limit_dependency)) -> StandardResponse:
     return StandardResponse(
         data=UserResponse.model_validate(user).model_dump(mode="json")
     )
