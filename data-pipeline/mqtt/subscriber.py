@@ -9,6 +9,7 @@ import signal
 import sys
 import threading
 import time
+import hashlib
 import uuid
 from typing import Optional
 
@@ -47,7 +48,7 @@ DEFAULT_INGEST_RETRY = _safe_int("MQTT_INGEST_RETRY", 3)
 def _on_connect(client, userdata, flags, rc):
     if rc == 0:
         print("[MQTT Sub] Connected. Subscribing...")
-        client.subscribe(TOPIC_PREFIX, qos=1)
+        client.subscribe(userdata.get("topic_prefix", "enviroswarm/sensors/#"), qos=1)
     else:
         print(f"[MQTT Sub] Connection failed with code {rc}")
 
@@ -65,7 +66,7 @@ def _post_with_retry(
     max_retries: int,
 ) -> bool:
     """POST payload to ingest API with retry, gzip, and 413 handling."""
-    api_url = f"{api_base}/api/v1/ingest"
+    api_url = api_base.rstrip('/') + '/api/v1/ingest'
     headers = {}
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
@@ -79,7 +80,7 @@ def _post_with_retry(
     else:
         data = raw_json
     headers["Content-Type"] = "application/json"
-    headers["X-Idempotency-Key"] = str(uuid.uuid4())
+    headers["X-Idempotency-Key"] = hashlib.sha256(raw_json.encode()).hexdigest()
 
     for attempt in range(max_retries + 1):
         try:
@@ -245,10 +246,6 @@ def start_subscriber(
     if mqtt is None:
         raise ImportError("paho-mqtt is required. Install it: pip install paho-mqtt")
 
-    global API_BASE, TOPIC_PREFIX
-    API_BASE = api_base
-    TOPIC_PREFIX = topic_prefix
-
     session = requests.Session()
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})
 
@@ -260,6 +257,7 @@ def start_subscriber(
         client_id=client_id or "enviroswarm-sub-001",
         clean_session=False,
     )
+    client.user_data_set({"topic_prefix": topic_prefix})
     client.on_connect = _on_connect
     client.on_message = _on_message_factory(q)
     client.on_disconnect = _on_disconnect

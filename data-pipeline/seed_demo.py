@@ -365,7 +365,7 @@ def run_seed(
         session = _make_session()
 
         if wait_for_backend:
-            print("\n[0/6] Waiting for backend to become available...")
+            print("\n[0/7] Waiting for backend to become available...")
             deadline = time.monotonic() + 60.0
             while time.monotonic() < deadline:
                 try:
@@ -379,13 +379,13 @@ def run_seed(
             else:
                 print("  WARNING: Backend did not respond within 60s, continuing anyway...")
 
-        print(f"\n[1/6] Registering demo user ({email})...")
+        print(f"\n[1/7] Registering demo user ({email})...")
         try:
             register_user(session, email, password, effective_api_base)
         except Exception as e:
             print(f"  Registration note: {e}")
 
-        print("[2/6] Logging in...")
+        print("[2/7] Logging in...")
         try:
             token = login_user(session, email, password, effective_api_base)
             print("  Authenticated successfully.")
@@ -394,7 +394,7 @@ def run_seed(
             summary["api_errors"] += 1
             return summary
 
-        print(f"[3/6] Upgrading tier to {tier}...")
+        print(f"[3/7] Upgrading tier to {tier}...")
         try:
             subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
             print(f"  Tier upgraded to {tier}.")
@@ -417,7 +417,7 @@ def run_seed(
         # 1b. Append mode — use existing stations
         # ------------------------------------------------------------------
         if append:
-            print("[4/6] Append mode: fetching existing stations...")
+            print("[4/7] Append mode: fetching existing stations...")
             try:
                 existing = list_stations(session, token, effective_api_base)
                 if not existing:
@@ -441,7 +441,7 @@ def run_seed(
     # 2. Create Stations
     # ------------------------------------------------------------------
     if not append:
-        print(f"\n[5/6] Creating {stations} simulated stations...")
+        print(f"\n[4/7] Creating {stations} simulated stations...")
         local_stations = create_stations(total=stations)
 
         for idx, station in enumerate(local_stations, 1):
@@ -471,7 +471,7 @@ def run_seed(
     # ------------------------------------------------------------------
     # 3. Generate Readings
     # ------------------------------------------------------------------
-    print(f"\n[6/6] Generating {days} days of historical readings...")
+    print(f"\n[5/7] Generating {days} days of historical readings...")
     print(f"       Interval: {INTERVAL_MINUTES} minutes | Missing: {MISSING_RATE*100:.0f}% | Outliers: {OUTLIER_RATE*100:.0f}%")
 
     end_time = datetime.now(timezone.utc).replace(microsecond=0)
@@ -490,7 +490,7 @@ def run_seed(
     # 4. Ingest in Batches
     # ------------------------------------------------------------------
     if not dry_run:
-        print(f"\n[7/7] Submitting readings in batches of {batch_size}...")
+        print(f"\n[6/7] Submitting readings in batches of {batch_size}...")
         total_batches = (len(readings) + batch_size - 1) // batch_size
         adaptive_delay = batch_delay
         for i in range(0, len(readings), batch_size):
@@ -520,7 +520,7 @@ def run_seed(
                 time.sleep(adaptive_delay)
     else:
         total_batches = (len(readings) + batch_size - 1) // batch_size
-        print(f"\n[7/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
+        print(f"\n[6/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
 
     # ------------------------------------------------------------------
     # 5. Summary Stats
@@ -554,7 +554,7 @@ def run_seed(
     # 6. Cleanup (only stations created in this run)
     # ------------------------------------------------------------------
     if cleanup and not dry_run and created_station_ids:
-        print(f"\n[8/8] Cleaning up {len(created_station_ids)} demo station(s)...")
+        print(f"\n[7/7] Cleaning up {len(created_station_ids)} demo station(s)...")
         for sid in created_station_ids:
             try:
                 delete_station(session, token, sid, effective_api_base)

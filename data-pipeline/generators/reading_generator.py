@@ -25,7 +25,7 @@ def _local_hour(timestamp: datetime, city: str) -> int:
 
 def _daily_seasonal_factor(hour: int, base_phase: float = 0.0) -> float:
     """Return a diurnal factor (-1 to 1) based on hour of day."""
-    # Simple sinusoidal: coldest ~6am, warmest ~noon (12h)
+    # Simple sinusoidal: coldest ~midnight (0h), warmest ~noon (12h)
     phase = (hour - 6) / 24 * 2 * math.pi + base_phase
     return math.sin(phase)
 
@@ -175,8 +175,7 @@ def generate_readings_for_station(
     Returns:
         List of reading dicts ready for ingest.
     """
-    if end_time is None:
-        end_time = datetime.now(timezone.utc).replace(microsecond=0)
+    end_time = (end_time or datetime.now(timezone.utc)).replace(microsecond=0)
     
     if interval_minutes <= 0:
         raise ValueError("interval_minutes must be > 0")
@@ -295,6 +294,14 @@ def generate_readings_for_station(
                 "timestamp": ts.isoformat(),
                 "metadata": metadata,
             })
+
+        # After all sensors for this timestamp, ensure pm10 >= pm25
+        if sensor_types:
+            timestamp_readings = readings[-len(sensor_types):]
+            pm25_reading = next((r for r in timestamp_readings if r["sensor_type"] == "pm25"), None)
+            pm10_reading = next((r for r in timestamp_readings if r["sensor_type"] == "pm10"), None)
+            if pm25_reading and pm10_reading and pm10_reading["value"] < pm25_reading["value"]:
+                pm10_reading["value"] = pm25_reading["value"]
 
     return readings
 

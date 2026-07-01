@@ -20,7 +20,16 @@ This starts an Eclipse Mosquitto broker on:
 - `localhost:1883` — MQTT
 - `localhost:9001` — WebSocket
 
-### 3. Run the Demo Seeder
+### 3. Set Demo Password
+
+```bash
+export DEMO_PASSWORD=Demo12345!
+```
+
+> The `DEMO_PASSWORD` environment variable is **required**.
+> You can also override it per-run with `--password`.
+
+### 4. Run the Demo Seeder
 
 ```bash
 # Dry-run (no API calls, just verify generation logic)
@@ -87,6 +96,7 @@ data-pipeline/
 ## Troubleshooting
 
 - **Backend not running**: Ensure `docker-compose up --build -d` is running in the `backend/` directory before running the full seeder.
+- **DEMO_PASSWORD missing**: If you see `DEMO_PASSWORD environment variable is required`, export it first: `export DEMO_PASSWORD=Demo12345!` or pass `--password`.
 - **Auth failures**: The demo user is auto-created; if it already exists, the script will login instead. You can override credentials with `--email`, `--password`, and `--tier` flags.
 - **Rate limiting**: If you hit rate limits, increase `--batch-delay` or reduce `--batch-size`.
 - **Appending readings**: Use `--append` to add new readings to existing stations without creating duplicates.
