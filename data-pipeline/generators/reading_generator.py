@@ -177,6 +177,8 @@ def generate_readings_for_station(
     """
     end_time = (end_time or datetime.now(timezone.utc)).replace(microsecond=0)
     
+    if days < 0:
+        raise ValueError("days must be >= 0")
     if interval_minutes <= 0:
         raise ValueError("interval_minutes must be > 0")
     if not (0 <= missing_rate <= 1):

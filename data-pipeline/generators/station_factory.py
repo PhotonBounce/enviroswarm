@@ -62,6 +62,9 @@ def create_station(
         k = random.randint(4, min(8, len(SENSOR_TYPES)))
         sensor_types = sorted(random.sample(SENSOR_TYPES, k))
     
+    if city_name not in CITY_CLUSTERS:
+        raise ValueError(f"Unknown city: {city_name}")
+    
     cluster = CITY_CLUSTERS[city_name]
     lat, lon = _random_offset(cluster["latitude"], cluster["longitude"], cluster["radius_km"])
     
@@ -89,6 +92,11 @@ def create_stations(
     Returns:
         List of station dicts.
     """
+    if total < 0:
+        raise ValueError("total must be >= 0")
+    if per_city is not None and per_city < 0:
+        raise ValueError("per_city must be >= 0")
+    
     cities = list(CITY_CLUSTERS.keys())
     if per_city is not None:
         total = per_city * len(cities)

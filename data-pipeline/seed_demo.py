@@ -161,7 +161,8 @@ def _station_limit_from_pricing(pricing: List[Dict[str, Any]], tier: str) -> int
     """Extract station limit for a given tier from pricing data."""
     for item in pricing:
         if isinstance(item, dict) and item.get("name") == tier:
-            return item.get("stations") or 1
+            stations = item.get("stations")
+            return stations if stations is not None else 1
     return 1
 
 
@@ -374,212 +375,216 @@ def run_seed(
     created_stations: List[Dict[str, Any]] = []
     created_station_ids: List[str] = []
 
-    if not dry_run:
-        print("=" * 60)
-        print("ENViroSwarm Demo Data Seeder")
-        print("=" * 60)
+    session = None
+    try:
+        if not dry_run:
+            print("=" * 60)
+            print("ENViroSwarm Demo Data Seeder")
+            print("=" * 60)
 
-        session = _make_session()
+            session = _make_session()
 
-        if wait_for_backend:
-            print("\n[0/7] Waiting for backend to become available...")
-            deadline = time.monotonic() + 60.0
-            while time.monotonic() < deadline:
-                try:
-                    probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
-                    if 200 <= probe.status_code < 300:
-                        print("  Backend is up.")
-                        break
-                except Exception:
-                    pass
-                time.sleep(1.0)
-            else:
-                print("  WARNING: Backend did not respond within 60s, continuing anyway...")
+            if wait_for_backend:
+                print("\n[0/7] Waiting for backend to become available...")
+                deadline = time.monotonic() + 60.0
+                while time.monotonic() < deadline:
+                    try:
+                        probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
+                        if 200 <= probe.status_code < 300:
+                            print("  Backend is up.")
+                            break
+                    except Exception:
+                        pass
+                    time.sleep(1.0)
+                else:
+                    print("  WARNING: Backend did not respond within 60s, continuing anyway...")
 
-        print(f"\n[1/7] Registering demo user ({email})...")
-        try:
-            register_user(session, email, password, effective_api_base)
-        except Exception as e:
-            print(f"  Registration note: {e}")
-
-        print("[2/7] Logging in...")
-        try:
-            token = login_user(session, email, password, effective_api_base)
-            print("  Authenticated successfully.")
-        except Exception as e:
-            print(f"  FATAL: Could not login: {e}")
-            summary["api_errors"] += 1
-            return summary
-
-        print(f"[3/7] Upgrading tier to {tier}...")
-        try:
-            subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
-            print(f"  Tier upgraded to {tier}.")
-        except Exception as e:
-            print(f"  Tier upgrade note: {e}")
-            # Fall back to querying current tier and pricing so we can adapt station count
+            print(f"\n[1/7] Registering demo user ({email})...")
             try:
-                me = get_user_me(session, token, effective_api_base)
-                actual_tier = me.get("tier", "free")
-                pricing = get_pricing(session, effective_api_base)
-                max_stations = _station_limit_from_pricing(pricing, actual_tier)
-                if stations > max_stations:
-                    print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
-                    stations = max_stations
-            except Exception as me_err:
-                print(f"  Could not determine tier: {me_err}")
-                stations = 1
-
-        # ------------------------------------------------------------------
-        # 1b. Append mode — use existing stations
-        # ------------------------------------------------------------------
-        if append:
-            print("[4/7] Append mode: fetching existing stations...")
-            try:
-                existing = list_stations(session, token, effective_api_base)
-                if not existing:
-                    print("  No existing stations found. Nothing to append to.")
-                    return summary
-                created_stations = existing
-                summary["stations_created"] = len(existing)
-                print(f"  Found {len(existing)} existing station(s).")
+                register_user(session, email, password, effective_api_base)
             except Exception as e:
-                print(f"  Could not fetch existing stations: {e}")
+                print(f"  Registration note: {e}")
+
+            print("[2/7] Logging in...")
+            try:
+                token = login_user(session, email, password, effective_api_base)
+                print("  Authenticated successfully.")
+            except Exception as e:
+                print(f"  FATAL: Could not login: {e}")
                 summary["api_errors"] += 1
                 return summary
-    else:
-        print("=" * 60)
-        print("ENViroSwarm Demo Data Seeder  —  DRY RUN")
-        print("=" * 60)
-        session = None
-        token = "dry-run-token"
 
-    # ------------------------------------------------------------------
-    # 2. Create Stations
-    # ------------------------------------------------------------------
-    if not append:
-        print(f"\n[4/7] Creating {stations} simulated stations...")
-        local_stations = create_stations(total=stations)
-
-        for idx, station in enumerate(local_stations, 1):
-            if dry_run:
-                print(f"  [{idx}/{stations}] {station['name']}  lat={station['latitude']} lon={station['longitude']} sensors={station['sensor_types']}")
-                created_stations.append(station)
-            else:
+            print(f"[3/7] Upgrading tier to {tier}...")
+            try:
+                subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
+                print(f"  Tier upgraded to {tier}.")
+            except Exception as e:
+                print(f"  Tier upgrade note: {e}")
+                # Fall back to querying current tier and pricing so we can adapt station count
                 try:
-                    api_station = create_station_api(session, token, station, effective_api_base)
-                    # Merge API response (which may contain real DB id) with our local data
-                    merged = {
-                        **station,
-                        "latitude": api_station.get("latitude", station["latitude"]),
-                        "longitude": api_station.get("longitude", station["longitude"]),
-                        "id": api_station.get("id", station["id"]),
-                    }
-                    created_stations.append(merged)
-                    created_station_ids.append(merged["id"])
-                    print(f"  [{idx}/{stations}] Created: {merged['name']} (id={merged['id']})")
-                    summary["stations_created"] += 1
+                    me = get_user_me(session, token, effective_api_base)
+                    actual_tier = me.get("tier", "free")
+                    pricing = get_pricing(session, effective_api_base)
+                    max_stations = _station_limit_from_pricing(pricing, actual_tier)
+                    if stations > max_stations:
+                        print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
+                        stations = max_stations
+                except Exception as me_err:
+                    print(f"  Could not determine tier: {me_err}")
+                    stations = 1
+
+            # ------------------------------------------------------------------
+            # 1b. Append mode — use existing stations
+            # ------------------------------------------------------------------
+            if append:
+                print("[4/7] Append mode: fetching existing stations...")
+                try:
+                    existing = list_stations(session, token, effective_api_base)
+                    if not existing:
+                        print("  No existing stations found. Nothing to append to.")
+                        return summary
+                    created_stations = existing
+                    summary["stations_created"] = len(existing)
+                    print(f"  Found {len(existing)} existing station(s).")
                 except Exception as e:
-                    print(f"  [{idx}/{stations}] ERROR creating {station['name']}: {e}")
+                    print(f"  Could not fetch existing stations: {e}")
                     summary["api_errors"] += 1
-                    # Do NOT add locally-fallback stations to created_stations
-                    # so we avoid sending readings for non-existent stations.
+                    return summary
+        else:
+            print("=" * 60)
+            print("ENViroSwarm Demo Data Seeder  —  DRY RUN")
+            print("=" * 60)
+            token = "dry-run-token"
 
-    # ------------------------------------------------------------------
-    # 3. Generate Readings
-    # ------------------------------------------------------------------
-    print(f"\n[5/7] Generating {days} days of historical readings...")
-    print(f"       Interval: {INTERVAL_MINUTES} minutes | Missing: {MISSING_RATE*100:.0f}% | Outliers: {OUTLIER_RATE*100:.0f}%")
+        # ------------------------------------------------------------------
+        # 2. Create Stations
+        # ------------------------------------------------------------------
+        if not append:
+            print(f"\n[4/7] Creating {stations} simulated stations...")
+            local_stations = create_stations(total=stations)
 
-    end_time = datetime.now(timezone.utc).replace(microsecond=0)
-    readings = generate_all_readings(
-        stations=created_stations,
-        days=days,
-        interval_minutes=INTERVAL_MINUTES,
-        missing_rate=MISSING_RATE,
-        outlier_rate=OUTLIER_RATE,
-        end_time=end_time,
-    )
-    summary["readings_generated"] = len(readings)
-    print(f"  Generated {len(readings):,} readings.")
+            for idx, station in enumerate(local_stations, 1):
+                if dry_run:
+                    print(f"  [{idx}/{stations}] {station['name']}  lat={station['latitude']} lon={station['longitude']} sensors={station['sensor_types']}")
+                    created_stations.append(station)
+                else:
+                    try:
+                        api_station = create_station_api(session, token, station, effective_api_base)
+                        # Merge API response (which may contain real DB id) with our local data
+                        merged = {
+                            **station,
+                            "latitude": api_station.get("latitude", station["latitude"]),
+                            "longitude": api_station.get("longitude", station["longitude"]),
+                            "id": api_station.get("id", station["id"]),
+                        }
+                        created_stations.append(merged)
+                        created_station_ids.append(merged["id"])
+                        print(f"  [{idx}/{stations}] Created: {merged['name']} (id={merged['id']})")
+                        summary["stations_created"] += 1
+                    except Exception as e:
+                        print(f"  [{idx}/{stations}] ERROR creating {station['name']}: {e}")
+                        summary["api_errors"] += 1
+                        # Do NOT add locally-fallback stations to created_stations
+                        # so we avoid sending readings for non-existent stations.
 
-    # ------------------------------------------------------------------
-    # 4. Ingest in Batches
-    # ------------------------------------------------------------------
-    if not dry_run:
-        print(f"\n[6/7] Submitting readings in batches of {batch_size}...")
-        total_batches = (len(readings) + batch_size - 1) // batch_size
-        adaptive_delay = batch_delay
-        for i in range(0, len(readings), batch_size):
-            batch = readings[i : i + batch_size]
-            batch_num = (i // batch_size) + 1
-            batch_start = time.monotonic()
-            try:
-                result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
-                summary["batches_sent"] += 1
-                inserted = result.get("inserted", "?")
-                print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
-            except (requests.RequestException, RuntimeError) as e:
-                summary["api_errors"] += 1
-                sample = json.dumps({"readings": batch[:2]})[:500]
-                print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
+        # ------------------------------------------------------------------
+        # 3. Generate Readings
+        # ------------------------------------------------------------------
+        print(f"\n[5/7] Generating {days} days of historical readings...")
+        print(f"       Interval: {INTERVAL_MINUTES} minutes | Missing: {MISSING_RATE*100:.0f}% | Outliers: {OUTLIER_RATE*100:.0f}%")
 
-            # Adaptive rate-limiting: if request took > 2s, increase delay;
-            # if request was fast, slowly decrease toward base delay.
-            elapsed_req = time.monotonic() - batch_start
-            if elapsed_req > 2.0:
-                adaptive_delay = min(adaptive_delay * 1.5, 5.0)
-            elif elapsed_req < 0.5 and adaptive_delay > batch_delay:
-                adaptive_delay = max(adaptive_delay * 0.9, batch_delay)
+        end_time = datetime.now(timezone.utc).replace(microsecond=0)
+        readings = generate_all_readings(
+            stations=created_stations,
+            days=days,
+            interval_minutes=INTERVAL_MINUTES,
+            missing_rate=MISSING_RATE,
+            outlier_rate=OUTLIER_RATE,
+            end_time=end_time,
+        )
+        summary["readings_generated"] = len(readings)
+        print(f"  Generated {len(readings):,} readings.")
 
-            # Skip sleep after the final batch
-            if batch_num < total_batches and adaptive_delay > 0:
-                time.sleep(adaptive_delay)
-    else:
-        total_batches = (len(readings) + batch_size - 1) // batch_size
-        print(f"\n[6/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
+        # ------------------------------------------------------------------
+        # 4. Ingest in Batches
+        # ------------------------------------------------------------------
+        if not dry_run:
+            print(f"\n[6/7] Submitting readings in batches of {batch_size}...")
+            total_batches = (len(readings) + batch_size - 1) // batch_size
+            adaptive_delay = batch_delay
+            for i in range(0, len(readings), batch_size):
+                batch = readings[i : i + batch_size]
+                batch_num = (i // batch_size) + 1
+                batch_start = time.monotonic()
+                try:
+                    result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
+                    summary["batches_sent"] += 1
+                    inserted = result.get("inserted", "?")
+                    print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
+                except (requests.RequestException, RuntimeError) as e:
+                    summary["api_errors"] += 1
+                    sample = json.dumps({"readings": batch[:2]})[:500]
+                    print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
 
-    # ------------------------------------------------------------------
-    # 5. Summary Stats
-    # ------------------------------------------------------------------
-    elapsed = time.time() - start_time
-    summary["elapsed_seconds"] = round(elapsed, 2)
+                # Adaptive rate-limiting: if request took > 2s, increase delay;
+                # if request was fast, slowly decrease toward base delay.
+                elapsed_req = time.monotonic() - batch_start
+                if elapsed_req > 2.0:
+                    adaptive_delay = min(adaptive_delay * 1.5, 5.0)
+                elif elapsed_req < 0.5 and adaptive_delay > batch_delay:
+                    adaptive_delay = max(adaptive_delay * 0.9, batch_delay)
 
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    print(f"  Mode:          {'DRY RUN' if dry_run else 'LIVE'}")
-    print(f"  API Base:      {effective_api_base}")
-    print(f"  Stations:      {summary['stations_created']}")
-    print(f"  Readings:      {summary['readings_generated']:,}")
-    print(f"  Batches sent:  {summary['batches_sent']}")
-    print(f"  API errors:    {summary['api_errors']}")
-    print(f"  Elapsed:       {summary['elapsed_seconds']:.2f}s")
+                # Skip sleep after the final batch
+                if batch_num < total_batches and adaptive_delay > 0:
+                    time.sleep(adaptive_delay)
+        else:
+            total_batches = (len(readings) + batch_size - 1) // batch_size
+            print(f"\n[6/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
 
-    # Per-sensor breakdown
-    sensor_counts = {}
-    for r in readings:
-        st = r["sensor_type"]
-        sensor_counts[st] = sensor_counts.get(st, 0) + 1
-    print("\n  Readings per sensor type:")
-    for st in sorted(sensor_counts.keys()):
-        print(f"    {st:<15} {sensor_counts[st]:>8,}")
+        # ------------------------------------------------------------------
+        # 5. Summary Stats
+        # ------------------------------------------------------------------
+        elapsed = time.time() - start_time
+        summary["elapsed_seconds"] = round(elapsed, 2)
 
-    print("=" * 60)
+        print("\n" + "=" * 60)
+        print("SUMMARY")
+        print("=" * 60)
+        print(f"  Mode:          {'DRY RUN' if dry_run else 'LIVE'}")
+        print(f"  API Base:      {effective_api_base}")
+        print(f"  Stations:      {summary['stations_created']}")
+        print(f"  Readings:      {summary['readings_generated']:,}")
+        print(f"  Batches sent:  {summary['batches_sent']}")
+        print(f"  API errors:    {summary['api_errors']}")
+        print(f"  Elapsed:       {summary['elapsed_seconds']:.2f}s")
 
-    # ------------------------------------------------------------------
-    # 6. Cleanup (only stations created in this run)
-    # ------------------------------------------------------------------
-    if cleanup and not dry_run and created_station_ids:
-        print(f"\n[7/7] Cleaning up {len(created_station_ids)} demo station(s)...")
-        for sid in created_station_ids:
-            try:
-                delete_station(session, token, sid, effective_api_base)
-                print(f"  Deleted station {sid}")
-            except Exception as del_err:
-                print(f"  Could not delete {sid}: {del_err}")
+        # Per-sensor breakdown
+        sensor_counts = {}
+        for r in readings:
+            st = r["sensor_type"]
+            sensor_counts[st] = sensor_counts.get(st, 0) + 1
+        print("\n  Readings per sensor type:")
+        for st in sorted(sensor_counts.keys()):
+            print(f"    {st:<15} {sensor_counts[st]:>8,}")
 
-    return summary
+        print("=" * 60)
+
+        # ------------------------------------------------------------------
+        # 6. Cleanup (only stations created in this run)
+        # ------------------------------------------------------------------
+        if cleanup and not dry_run and created_station_ids:
+            print(f"\n[7/7] Cleaning up {len(created_station_ids)} demo station(s)...")
+            for sid in created_station_ids:
+                try:
+                    delete_station(session, token, sid, effective_api_base)
+                    print(f"  Deleted station {sid}")
+                except Exception as del_err:
+                    print(f"  Could not delete {sid}: {del_err}")
+
+        return summary
+    finally:
+        if session is not None:
+            session.close()
 
 
 # ---------------------------------------------------------------------------

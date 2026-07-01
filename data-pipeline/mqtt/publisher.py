@@ -105,7 +105,10 @@ def publish_readings(
         if delay_seconds:
             time.sleep(delay_seconds)
     
-    client.disconnect()
-    client.loop_stop()
+    try:
+        client.disconnect()
+        client.loop_stop()
+    except Exception as e:
+        print(f"[MQTT] Warning: cleanup error during disconnect/loop_stop: {e}")
     print(f"[MQTT] Published {published} messages.")
     return published

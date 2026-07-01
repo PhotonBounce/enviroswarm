@@ -164,20 +164,21 @@ def _start_worker(
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
+    thread_ref = {"thread": t}
+
     def watcher():
         """Watch the worker thread and respawn it if it dies."""
-        nonlocal t
         while not stop_event.is_set():
-            t.join(timeout=1.0)
-            if not stop_event.is_set() and not t.is_alive():
+            thread_ref["thread"].join(timeout=1.0)
+            if not stop_event.is_set() and not thread_ref["thread"].is_alive():
                 print("[MQTT Sub] Worker thread died, respawning...")
-                t = threading.Thread(target=worker, daemon=True)
-                t.start()
+                thread_ref["thread"] = threading.Thread(target=worker, daemon=True)
+                thread_ref["thread"].start()
             time.sleep(1.0)
 
     watcher_thread = threading.Thread(target=watcher, daemon=True)
     watcher_thread.start()
-    return q, stop_event, t
+    return q, stop_event, thread_ref
 
 
 def _on_message_factory(q: queue.Queue):
@@ -201,7 +202,7 @@ def _on_message_factory(q: queue.Queue):
     return _on_message
 
 
-def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, worker_thread: threading.Thread, client, timeout: float = 30.0):
+def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, thread_ref: dict, client, session: Optional[requests.Session] = None, timeout: float = 30.0):
     """Gracefully drain the queue and shut down the worker thread."""
     print(f"[MQTT Sub] Draining queue ({q.qsize()} items remaining)...")
     drain_start = time.monotonic()
@@ -209,12 +210,17 @@ def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, worker_thre
         time.sleep(0.05)
     remaining = time.monotonic() - drain_start
     stop_event.set()
-    worker_thread.join(timeout=max(0.0, timeout - remaining))
+    thread_ref["thread"].join(timeout=max(0.0, timeout - remaining))
     try:
         client.disconnect()
         client.loop_stop()
     except Exception as e:
         print(f"[MQTT Sub] Warning: cleanup error during disconnect/loop_stop: {e}")
+    if session is not None:
+        try:
+            session.close()
+        except Exception as e:
+            print(f"[MQTT Sub] Warning: cleanup error during session close: {e}")
     print("[MQTT Sub] Shutdown complete.")
 
 
@@ -260,7 +266,7 @@ def start_subscriber(
     session = requests.Session()
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})
 
-    q, stop_event, worker_thread = _start_worker(
+    q, stop_event, thread_ref = _start_worker(
         session, api_base, auth_token, max_queue_size, ingest_timeout, max_retries
     )
 
@@ -276,7 +282,7 @@ def start_subscriber(
     # Graceful shutdown on SIGTERM (Docker)
     def _signal_handler(signum, frame):
         print(f"[MQTT Sub] Received signal {signum}, shutting down gracefully...")
-        _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
+        _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _signal_handler)
@@ -286,6 +292,10 @@ def start_subscriber(
     except Exception as e:
         print(f"[MQTT Sub] Could not connect to broker {broker_host}:{broker_port}: {e}")
         stop_event.set()
+        try:
+            session.close()
+        except Exception:
+            pass
         return
 
     client.loop_start()
@@ -303,10 +313,10 @@ def start_subscriber(
             time.sleep(run_duration_seconds)
         except KeyboardInterrupt:
             print("[MQTT Sub] Stopped by user during timed run, shutting down gracefully...")
-            _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
+            _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
             print("[MQTT Sub] Stopped.")
             return
-        _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
+        _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
         print("[MQTT Sub] Stopped.")
     else:
         # Keep running until interrupted
@@ -315,7 +325,7 @@ def start_subscriber(
                 time.sleep(1)
         except KeyboardInterrupt:
             print("[MQTT Sub] Stopped by user, shutting down gracefully...")
-            _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
+            _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
 
 
 def main():
