@@ -174,8 +174,8 @@ export function useCreateApiKey() {
       if (!res.data?.success) {
         throw new Error(res.data?.error || 'Failed to create API key')
       }
-      // Map the backend's ambiguous `key_hash` field to `raw_key` for clarity
-      return { ...res.data.data, raw_key: res.data.data.key_hash } as ApiKeyCreateResponse
+      // Map the backend's `key` field (raw key shown once at creation) to `raw_key` for clarity
+      return { ...res.data.data, raw_key: res.data.data.key } as ApiKeyCreateResponse
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['apikeys'] })

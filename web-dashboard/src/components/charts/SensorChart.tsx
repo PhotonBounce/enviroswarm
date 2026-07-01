@@ -21,18 +21,6 @@ interface SensorChartProps {
 }
 
 export default function SensorChart({ data, type = 'area', showLegend = true }: SensorChartProps) {
-  if (!data.length) {
-    return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
-        No data available
-      </div>
-    )
-  }
-
-  // Group data by full ISO timestamp and sensor_type for multi-line chart.
-  // Using the full timestamp prevents data loss when multiple readings occur
-  // within the same minute (previously collisions were caused by minute-level
-  // formatting used as the Map key).
   const chartData = useMemo(() => {
     const timestamps = new Map<string, Record<string, number>>()
     for (const r of data) {
@@ -54,6 +42,14 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
     for (const r of data) set.add(r.sensor_type)
     return Array.from(set)
   }, [data])
+
+  if (!data.length) {
+    return (
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        No data available
+      </div>
+    )
+  }
 
   const ChartComponent = type === 'area' ? AreaChart : LineChart
 

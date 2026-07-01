@@ -29,14 +29,7 @@ interface Props {
 
 export default function DataViewScreen({ route }: Props) {
   const params = route.params;
-  if (!params?.stationId || !params?.stationName) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <Text style={styles.errorText}>Invalid navigation parameters</Text>
-      </SafeAreaView>
-    );
-  }
-  const { stationId, stationName } = params;
+  const { stationId, stationName } = params || {};
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
   const sensorType = 'all';
@@ -51,6 +44,7 @@ export default function DataViewScreen({ route }: Props) {
   }, []);
 
   const fetchData = useCallback(async () => {
+    if (!stationId) return;
     setLoading(true);
     try {
       const searchParams = new URLSearchParams({ station_id: stationId, limit: '100' });
@@ -119,6 +113,14 @@ export default function DataViewScreen({ route }: Props) {
   }), []);
 
   const types = Object.keys(groupedByType) as SensorType[];
+
+  if (!stationId || !stationName) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <Text style={styles.errorText}>Invalid navigation parameters</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
