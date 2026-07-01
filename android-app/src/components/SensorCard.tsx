@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SensorReading, SENSOR_UNITS } from '../types';
+import type { SensorReading } from '../types';
+import { SENSOR_UNITS } from '../types';
 
 interface SensorCardProps {
   reading: SensorReading;

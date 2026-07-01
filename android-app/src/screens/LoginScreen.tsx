@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../context/AuthContext';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
@@ -37,8 +37,8 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true);
     try {
       await login(email.trim(), password);
-    } catch (err: any) {
-      Alert.alert('Login Failed', err?.message || 'Please try again');
+    } catch (err: unknown) {
+      Alert.alert('Login Failed', err instanceof Error ? err.message : 'Please try again');
     } finally {
       setLoading(false);
     }

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../context/AuthContext';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
@@ -53,8 +53,8 @@ export default function RegisterScreen({ navigation }: Props) {
     setLoading(true);
     try {
       await register(email.trim(), password);
-    } catch (err: any) {
-      Alert.alert('Registration Failed', err?.message || 'Please try again');
+    } catch (err: unknown) {
+      Alert.alert('Registration Failed', err instanceof Error ? err.message : 'Please try again');
     } finally {
       setLoading(false);
     }

@@ -9,12 +9,13 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Region } from 'react-native-maps';
+import MapView from 'react-native-maps';
+import type { Region } from 'react-native-maps';
 import { useLocation } from '../hooks/useLocation';
 import { apiClient } from '../api/client';
-import { SensorStation, ApiResponse } from '../types';
+import type { SensorStation, ApiResponse } from '../types';
 import { StationMarker } from '../components/StationMarker';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;

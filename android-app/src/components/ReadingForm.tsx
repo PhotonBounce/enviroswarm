@@ -10,7 +10,8 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { SensorType, SENSOR_TYPES, SENSOR_UNITS } from '../types';
+import type { SensorType } from '../types';
+import { SENSOR_TYPES, SENSOR_UNITS } from '../types';
 
 interface ReadingFormProps {
   stationId: string;

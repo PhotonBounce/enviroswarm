@@ -8,7 +8,7 @@ const mobileNavItems = [
   { path: '/', label: 'Dashboard' },
   { path: '/stations', label: 'Stations' },
   { path: '/data', label: 'Data' },
-  { path: '/apikeys', label: 'Keys' },
+  { path: '/apikeys', label: 'API Keys' },
   { path: '/pricing', label: 'Pricing' },
   { path: '/profile', label: 'Profile' },
 ]

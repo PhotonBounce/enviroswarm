@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Marker } from 'react-native-maps';
-import { SensorStation } from '../types';
+import type { SensorStation } from '../types';
 
 interface StationMarkerProps {
   station: SensorStation;

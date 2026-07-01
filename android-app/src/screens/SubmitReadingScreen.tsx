@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../api/client';
-import { SensorStation, ApiResponse, SensorReading, SensorType, SENSOR_UNITS } from '../types';
+import type { SensorStation, ApiResponse, SensorReading, SensorType } from '../types';
 import { useLocation } from '../hooks/useLocation';
 import { ReadingForm } from '../components/ReadingForm';
 

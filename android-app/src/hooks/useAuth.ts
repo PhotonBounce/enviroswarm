@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { AxiosError } from 'axios';
 import { apiClient, authEvents, clearCachedToken } from '../api/client';
-import { User, AuthTokens, ApiResponse } from '../types';
+import type { User, AuthTokens, ApiResponse } from '../types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

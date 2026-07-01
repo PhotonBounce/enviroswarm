@@ -12,10 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LineChart } from 'react-native-chart-kit';
 import { apiClient } from '../api/client';
-import { SensorReading, ApiResponse, SensorType, SENSOR_UNITS } from '../types';
+import type { SensorReading, ApiResponse, SensorType } from '../types';
+import { SENSOR_UNITS } from '../types';
 import { SensorCard } from '../components/SensorCard';
-import { RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 type RootStackParamList = {
   DataView: { stationId: string; stationName: string };
@@ -38,7 +39,7 @@ export default function DataViewScreen({ route }: Props) {
   const { stationId, stationName } = params;
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sensorType] = useState<SensorType | 'all'>('all');
+  const sensorType = 'all';
   const isMounted = useRef(true);
   const { width } = useWindowDimensions();
   const screenWidth = width - 32;

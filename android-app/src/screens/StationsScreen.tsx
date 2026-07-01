@@ -17,9 +17,10 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiClient } from '../api/client';
-import { SensorStation, SensorType, SENSOR_TYPES, ApiResponse } from '../types';
+import type { SensorStation, SensorType, ApiResponse } from '../types';
+import { SENSOR_TYPES } from '../types';
 import { useLocation } from '../hooks/useLocation';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 interface Props {
   navigation: NativeStackNavigationProp<any>;
