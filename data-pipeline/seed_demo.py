@@ -161,7 +161,7 @@ def _station_limit_from_pricing(pricing: List[Dict[str, Any]], tier: str) -> int
     """Extract station limit for a given tier from pricing data."""
     for item in pricing:
         if isinstance(item, dict) and item.get("name") == tier:
-            return item.get("stations", 1)
+            return item.get("stations") or 1
     return 1
 
 
@@ -206,7 +206,7 @@ def list_stations(session: requests.Session, token: str, api_base: str) -> List[
             break
         stations.extend(data)
         meta = body.get("meta", {})
-        total = meta.get("total", 0)
+        total = meta.get("total") or 0
         if offset + limit >= total:
             break
         offset += limit

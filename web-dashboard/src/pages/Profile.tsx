@@ -43,7 +43,7 @@ export default function Profile() {
     e.preventDefault()
     setSaveError('')
     setSaveSuccess(false)
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       setSaveError('Please enter a valid email address')
       return
     }

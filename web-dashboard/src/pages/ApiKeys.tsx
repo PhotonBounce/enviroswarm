@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Key, Plus, Copy, Trash2, AlertTriangle, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -23,7 +23,13 @@ export default function ApiKeys() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [createError, setCreateError] = useState('')
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+    }
+  }, [])
   const canManageKeys = tier === 'pro' || tier === 'enterprise'
 
   const handleCreate = async (e: React.FormEvent) => {
