@@ -35,6 +35,11 @@ async def ingest(
 
     # Idempotency check — transactional via DB
     idempotency_key = request.headers.get("X-Idempotency-Key")
+    if idempotency_key and len(idempotency_key) > 256:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency key too long",
+        )
     key_hash = None
     if idempotency_key:
         key_hash = hashlib.sha256(f"{user.id}:{idempotency_key}".encode()).hexdigest()
@@ -147,25 +152,20 @@ async def ingest(
         return StandardResponse(data=result_data)
     except IntegrityError as exc:
         await db.rollback()
-        if idempotency_key and key_hash:
-            if "uq_idempotency_user_key" in str(exc.orig):
-                idem_result = await db.execute(
-                    select(IdempotencyKey).where(
-                        IdempotencyKey.user_id == user.id,
-                        IdempotencyKey.key_hash == key_hash,
-                        IdempotencyKey.expires_at > datetime.now(timezone.utc),
-                    )
+        if idempotency_key and key_hash and exc.orig is not None and "uq_idempotency_user_key" in str(exc.orig):
+            idem_result = await db.execute(
+                select(IdempotencyKey).where(
+                    IdempotencyKey.user_id == user.id,
+                    IdempotencyKey.key_hash == key_hash,
+                    IdempotencyKey.expires_at > datetime.now(timezone.utc),
                 )
-                cached = idem_result.scalar_one_or_none()
-                if cached:
-                    return StandardResponse(data=cached.response)
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Idempotency conflict or duplicate key",
-                ) from exc
+            )
+            cached = idem_result.scalar_one_or_none()
+            if cached:
+                return StandardResponse(data=cached.response)
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Database integrity error",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency conflict or duplicate key",
             ) from exc
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

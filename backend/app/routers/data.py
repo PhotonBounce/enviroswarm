@@ -54,7 +54,8 @@ async def query_data(
         raise HTTPException(status_code=400, detail="start cannot be after end")
 
     if aggregate and aggregate != "none":
-        # Aggregation query using date_trunc
+        # NOTE: Aggregation uses date_trunc, which is PostgreSQL-specific.
+        # Ensure the database backend supports it, or add a fallback.
         trunc_map = {"hour": "hour", "day": "day", "month": "month"}
         trunc_unit = trunc_map[aggregate]
 
@@ -128,7 +129,7 @@ async def query_data(
     # Count total for pagination
     count_stmt = stmt.with_only_columns(func.count(SensorReading.id))
     count_result = await db.execute(count_stmt)
-    total = count_result.scalar_one() or 0
+    total = count_result.scalar_one()
 
     stmt = stmt.order_by(SensorReading.timestamp.desc()).offset(offset).limit(limit)
     result = await db.execute(stmt)

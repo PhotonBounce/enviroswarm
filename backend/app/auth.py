@@ -128,6 +128,10 @@ def decode_refresh_token(token: str) -> dict:
 
 # ---------------------------------------------------------------------------
 # Refresh token revocation (in-memory; replace with Redis in production)
+#
+# TODO: In production, replace this with Redis or a similar persistent,
+# distributed store to ensure revoked tokens are recognized across all
+# server instances.
 # ---------------------------------------------------------------------------
 
 _refresh_token_blacklist: set = set()

@@ -70,8 +70,8 @@ class SensorStation(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    latitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 8), nullable=True)
-    longitude: Mapped[Optional[float]] = mapped_column(Numeric(11, 8), nullable=True)
+    latitude: Mapped[Optional[float]] = mapped_column(Numeric(10, 8), nullable=True, asdecimal=False)
+    longitude: Mapped[Optional[float]] = mapped_column(Numeric(11, 8), nullable=True, asdecimal=False)
     sensor_types: Mapped[List[str]] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -110,10 +110,13 @@ class SensorReading(Base):
         nullable=False,
     )
     sensor_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    value: Mapped[float] = mapped_column(Numeric(15, 6), nullable=False)
+    value: Mapped[float] = mapped_column(Numeric(15, 6), nullable=False, asdecimal=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     reading_metadata: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(

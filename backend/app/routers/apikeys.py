@@ -59,7 +59,7 @@ async def create_api_key(
         key_prefix=key_prefix,
         key_hash=key_hash,
         name=body.name,
-        permissions=body.permissions or {"read": True, "write": False},
+        permissions=body.permissions if body.permissions is not None else {"read": True, "write": False},
         rate_limit_per_min=100 if user.tier == "pro" else 1000,
         expires_at=body.expires_at,
     )

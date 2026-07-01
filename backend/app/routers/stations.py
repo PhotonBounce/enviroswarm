@@ -176,7 +176,7 @@ async def delete_station(
     await db.execute(
         update(SensorReading)
         .where(SensorReading.station_id == station.id, SensorReading.deleted_at.is_(None))
-        .values(deleted_at=now)
+        .values(deleted_at=now, updated_at=now)
     )
     await db.commit()
     return StandardResponse(data={"deleted": str(station_id)})

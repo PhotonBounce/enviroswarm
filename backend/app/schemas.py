@@ -39,7 +39,7 @@ SENSOR_TYPES = [
 
 class UserRegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=8, max_length=72)
 
     @field_validator("password", mode="after")
     @classmethod
@@ -179,7 +179,7 @@ class SensorReadingPayload(BaseModel):
     station_id: UUID
     sensor_type: str
     value: float
-    unit: str = Field(..., min_length=1, max_length=20)
+    unit: str = Field(..., max_length=20)
     timestamp: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
 
@@ -231,7 +231,7 @@ class DataQueryResponse(BaseModel):
     value: float
     unit: str
     timestamp: datetime
-    metadata: Optional[Dict[str, Any]] = Field(default=None, alias="reading_metadata")
+    reading_metadata: Optional[Dict[str, Any]] = Field(default=None, serialization_alias="metadata")
 
     class Config:
         from_attributes = True

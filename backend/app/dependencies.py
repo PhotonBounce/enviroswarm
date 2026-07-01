@@ -19,7 +19,10 @@ from app.constants import RATE_LIMITS
 
 # ---------------------------------------------------------------------------
 # In-memory rate-limit store: { key: (count, window_start) }
-# Replace with Redis in production.
+#
+# TODO: In production, replace this with Redis or a similar distributed
+# store to ensure rate limits are enforced consistently across multiple
+# server instances.
 # ---------------------------------------------------------------------------
 
 _rate_limit_store: dict = {}
@@ -118,13 +121,16 @@ async def get_current_user_or_api_key(
                         status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
                     )
                 # Update last_used_at in a separate session to avoid committing shared session
-                async with get_sessionmaker()() as session:
-                    await session.execute(
-                        update(ApiKey)
-                        .where(ApiKey.id == api_key.id)
-                        .values(last_used_at=datetime.now(timezone.utc))
-                    )
-                    await session.commit()
+                try:
+                    async with get_sessionmaker()() as session:
+                        await session.execute(
+                            update(ApiKey)
+                            .where(ApiKey.id == api_key.id)
+                            .values(last_used_at=datetime.now(timezone.utc))
+                        )
+                        await session.commit()
+                except Exception:
+                    pass  # Silently fail; last_used_at is best-effort
                 user_result = await db.execute(
                     select(User).where(
                         User.id == api_key.user_id,
