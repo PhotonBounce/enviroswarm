@@ -96,12 +96,13 @@ def create_stations(
     stations = []
     name_pool = STATION_NAMES[:]
     random.shuffle(name_pool)
-    name_idx = 0
     
     for i in range(total):
         city = cities[i % len(cities)]
-        name = name_pool[name_idx % len(name_pool)]
-        name_idx += 1
+        name = name_pool[i % len(name_pool)]
+        suffix = i // len(name_pool)
+        if suffix > 0:
+            name = f"{name} #{suffix + 1}"
         stations.append(create_station(city, name))
     
     # Shuffle so they are not grouped by city in order

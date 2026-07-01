@@ -32,7 +32,9 @@ from generators.reading_generator import generate_all_readings
 # ---------------------------------------------------------------------------
 API_BASE = "http://localhost:8000"
 DEMO_EMAIL = os.getenv("DEMO_EMAIL", "demo@enviroswarm.local")
-DEMO_PASSWORD = os.getenv("DEMO_PASSWORD", "Demo12345!")
+DEMO_PASSWORD = os.getenv("DEMO_PASSWORD")
+if not DEMO_PASSWORD:
+    raise ValueError("DEMO_PASSWORD environment variable is required")
 DEMO_TIER = os.getenv("DEMO_TIER", "enterprise")
 
 TOTAL_STATIONS = 30
@@ -258,11 +260,15 @@ def _ingest_with_payload(
         "X-Idempotency-Key": hashlib.sha256(json.dumps(payload).encode("utf-8")).hexdigest(),
     }
     raw_json = json.dumps(payload).encode("utf-8")
-    compressed = gzip.compress(raw_json)
-    headers["Content-Encoding"] = "gzip"
+    if len(raw_json) > 1024:
+        compressed = gzip.compress(raw_json)
+        headers["Content-Encoding"] = "gzip"
+        data = compressed
+    else:
+        data = raw_json
     return session.post(
         _api_url(api_base, "/api/v1/ingest"),
-        data=compressed,
+        data=data,
         headers=headers,
         timeout=ingest_timeout,
     )
@@ -349,64 +355,6 @@ def run_seed(
     if batch_size <= 0:
         raise ValueError("batch_size must be > 0")
 
-    # ------------------------------------------------------------------
-    # 1. Auth
-    # ------------------------------------------------------------------
-    if not dry_run:
-        print("=" * 60)
-        print("ENViroSwarm Demo Data Seeder")
-        print("=" * 60)
-
-        session = _make_session()
-
-        if wait_for_backend:
-            print("\n[0/6] Waiting for backend to become available...")
-            deadline = time.monotonic() + 60.0
-            while time.monotonic() < deadline:
-                try:
-                    probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
-                    if 200 <= probe.status_code < 300:
-                        print("  Backend is up.")
-                        break
-                except Exception:
-                    pass
-                time.sleep(1.0)
-            else:
-                print("  WARNING: Backend did not respond within 60s, continuing anyway...")
-
-        print(f"\n[1/6] Registering demo user ({email})...")
-        try:
-            register_user(session, email, password, effective_api_base)
-        except Exception as e:
-            print(f"  Registration note: {e}")
-
-        print("[2/6] Logging in...")
-        try:
-            token = login_user(session, email, password, effective_api_base)
-            print("  Authenticated successfully.")
-        except Exception as e:
-            print(f"  FATAL: Could not login: {e}")
-            summary["api_errors"] += 1
-            return summary
-
-        print(f"[3/6] Upgrading tier to {tier}...")
-        try:
-            subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
-            print(f"  Tier upgraded to {tier}.")
-        except Exception as e:
-            print(f"  Tier upgrade note: {e}")
-            # Fall back to querying current tier and pricing so we can adapt station count
-            try:
-                me = get_user_me(session, token, effective_api_base)
-                actual_tier = me.get("tier", "free")
-                pricing = get_pricing(session, effective_api_base)
-                max_stations = _station_limit_from_pricing(pricing, actual_tier)
-                if stations > max_stations:
-                    print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
-                    stations = max_stations
-            except Exception as me_err:
-                print(f"  Could not determine tier: {me_err}")
-                stations = 1
 
     created_stations: List[Dict[str, Any]] = []
     created_station_ids: List[str] = []
@@ -706,6 +654,15 @@ def main():
         help="Skip station creation and append readings to existing stations.",
     )
     args = parser.parse_args()
+
+    if args.stations <= 0:
+        raise ValueError("stations must be > 0")
+    if args.days < 0:
+        raise ValueError("days must be >= 0")
+    if args.batch_delay < 0:
+        raise ValueError("batch_delay must be >= 0")
+    if args.ingest_timeout <= 0:
+        raise ValueError("ingest_timeout must be > 0")
 
     summary = run_seed(
         dry_run=args.dry_run,

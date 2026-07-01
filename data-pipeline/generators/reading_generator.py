@@ -178,6 +178,13 @@ def generate_readings_for_station(
     if end_time is None:
         end_time = datetime.now(timezone.utc).replace(microsecond=0)
     
+    if interval_minutes <= 0:
+        raise ValueError("interval_minutes must be > 0")
+    if not (0 <= missing_rate <= 1):
+        raise ValueError("missing_rate must be between 0 and 1")
+    if not (0 <= outlier_rate <= 1):
+        raise ValueError("outlier_rate must be between 0 and 1")
+    
     start_time = end_time - timedelta(days=days)
     sensor_types = station.get("sensor_types", [])
     station_id = station.get("id")
@@ -272,8 +279,13 @@ def generate_readings_for_station(
                 if st in ("humidity", "co2", "pm25", "pm10", "noise_level",
                           "radiation", "air_quality", "water_quality", "voc"):
                     value = max(0.0, value)
+                    if st == "humidity":
+                        value = min(100.0, value)
+                    elif st == "water_quality":
+                        value = min(100.0, value)
                 elif st == "temperature":
                     value = max(-80.0, value)
+                    value = min(90.0, value)
 
             readings.append({
                 "station_id": station_id,

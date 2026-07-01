@@ -93,7 +93,7 @@ def _post_with_retry(
                 # Single message too large — can't split further, drop and log
                 print(f"[MQTT Sub] 413 Payload Too Large (attempt {attempt + 1}), dropping message")
                 return False
-            if resp.status_code == 200:
+            if resp.status_code < 400:
                 try:
                     body_json = resp.json()
                     if body_json.get("success"):
@@ -211,8 +211,8 @@ def _drain_and_shutdown(q: queue.Queue, worker_thread: threading.Thread, client,
         time.sleep(0.05)
     remaining = time.monotonic() - drain_start
     worker_thread.join(timeout=max(0.0, timeout - remaining))
-    client.loop_stop()
     client.disconnect()
+    client.loop_stop()
     print("[MQTT Sub] Shutdown complete.")
 
 
@@ -250,15 +250,6 @@ def start_subscriber(
     TOPIC_PREFIX = topic_prefix
 
     session = requests.Session()
-    retry_strategy = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["POST", "GET"],
-    )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})
 
     q, stop_event, worker_thread = _start_worker(
@@ -373,6 +364,16 @@ def main():
         help="If set, stop after this many seconds",
     )
     args = parser.parse_args()
+
+    if args.broker_port <= 0:
+        raise ValueError("broker_port must be > 0")
+    if args.max_queue_size <= 0:
+        raise ValueError("max_queue_size must be > 0")
+    if args.ingest_timeout <= 0:
+        raise ValueError("ingest_timeout must be > 0")
+    if args.max_retries < 0:
+        raise ValueError("max_retries must be >= 0")
+
     start_subscriber(
         broker_host=args.broker_host,
         broker_port=args.broker_port,

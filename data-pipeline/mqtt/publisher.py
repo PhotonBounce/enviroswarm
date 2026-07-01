@@ -40,6 +40,11 @@ def publish_readings(
     if mqtt is None:
         raise ImportError("paho-mqtt is required. Install it: pip install paho-mqtt")
     
+    if broker_port <= 0:
+        raise ValueError("broker_port must be > 0")
+    if delay_seconds < 0:
+        raise ValueError("delay_seconds must be >= 0")
+    
     client = mqtt.Client(client_id=client_id or f"enviroswarm-pub-{random.randint(1000,9999)}")
     client.on_connect = _on_connect
     client.on_publish = _on_publish
