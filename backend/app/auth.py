@@ -31,6 +31,8 @@ def validate_password(password: str) -> None:
     """Raise ValueError if password does not meet complexity requirements."""
     if len(password) < 8:
         raise ValueError("Password must be at least 8 characters")
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must be 72 bytes or less")
     if not re.search(r"[A-Z]", password):
         raise ValueError("Password must contain at least one uppercase letter")
     if not re.search(r"[a-z]", password):
@@ -194,7 +196,7 @@ async def _get_user_from_token(token: str, db: AsyncSession) -> User:
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
-    request: Request = None,
+    request: Optional[Request] = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Authenticate user from JWT in Authorization header OR httpOnly cookie."""
