@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Header, Request, status
-from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 

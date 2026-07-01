@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { apiClient, authEvents } from '../api/client';
+import { apiClient, authEvents, clearCachedToken } from '../api/client';
 import { User, AuthTokens, ApiResponse } from '../types';
 
 export function useAuth() {
@@ -106,6 +106,7 @@ export function useAuth() {
 
   const logout = async (): Promise<void> => {
     await SecureStore.deleteItemAsync('access_token');
+    clearCachedToken();
     setUser(null);
   };
 

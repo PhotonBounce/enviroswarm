@@ -42,6 +42,10 @@ export default function Profile() {
   const handleSave = async () => {
     setSaveError('')
     setSaveSuccess(false)
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setSaveError('Please enter a valid email address')
+      return
+    }
     try {
       await updateUser.mutateAsync({ email })
       setSaveSuccess(true)
@@ -123,7 +127,7 @@ export default function Profile() {
             <div className="flex gap-2">
               {isEditing ? (
                 <>
-                  <Button onClick={() => { setIsEditing(false); setEmail(user?.email ?? ''); setSaveError('') }} variant="outline">
+                  <Button onClick={() => { setIsEditing(false); setEmail(user?.email ?? ''); setSaveError(''); setSaveSuccess(false) }} variant="outline">
                     Cancel
                   </Button>
                   <Button onClick={handleSave} disabled={updateUser.isPending}>

@@ -27,6 +27,10 @@ export const authEvents = {
 
 let cachedToken: string | null = null;
 
+export function clearCachedToken() {
+  cachedToken = null;
+}
+
 apiClient.interceptors.request.use(
   async (config) => {
     if (cachedToken === null) {

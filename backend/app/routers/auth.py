@@ -62,6 +62,10 @@ async def register(
             detail="Too many registration attempts",
         )
 
+    # Normalize email for case-insensitive comparison.
+    # NOTE: A migration should add a functional unique index on lower(email) to enforce case-insensitive uniqueness.
+    body.email = body.email.lower().strip()
+
     # Check duplicate email
     result = await db.execute(
         select(User).where(User.email == body.email, User.deleted_at.is_(None))
@@ -98,6 +102,9 @@ async def login(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts. Try again later.",
         )
+
+    # Normalize email for case-insensitive lookup
+    body.email = body.email.lower().strip()
 
     result = await db.execute(
         select(User).where(

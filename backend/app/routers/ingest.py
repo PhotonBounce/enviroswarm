@@ -159,9 +159,13 @@ async def ingest(
                 cached = idem_result.scalar_one_or_none()
                 if cached:
                     return StandardResponse(data=cached.response)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Idempotency conflict or duplicate key",
+                ) from exc
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Idempotency conflict or duplicate key",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Database integrity error",
             ) from exc
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

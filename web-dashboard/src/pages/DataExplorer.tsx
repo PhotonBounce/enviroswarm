@@ -27,6 +27,7 @@ export default function DataExplorer() {
   const [end, setEnd] = useState('')
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(50)
+  const [dateError, setDateError] = useState('')
   const [queryParams, setQueryParams] = useState<{
     station_id?: string
     sensor_type?: SensorType
@@ -41,6 +42,7 @@ export default function DataExplorer() {
   const meta = response?.meta
 
   const handleSearch = () => {
+    setDateError('')
     const params: typeof queryParams = { page: 1, limit }
     if (stationId) params.station_id = stationId
     if (sensorType) params.sensor_type = sensorType
@@ -57,7 +59,7 @@ export default function DataExplorer() {
       }
     }
     if (params.start && params.end && new Date(params.start) > new Date(params.end)) {
-      alert('Start date must be before end date')
+      setDateError('Start date must be before end date')
       return
     }
     setPage(1)
@@ -87,7 +89,13 @@ export default function DataExplorer() {
       String(r.value),
       r.unit,
     ])
-    const csv = [headers.join(','), ...rows.map((row) => row.map((value) => String(value).includes(',') ? `"${value}"` : value).join(','))].join('\n')
+    const escapeCsv = (value: string) => {
+      if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
+        return `"${value.replace(/"/g, '""')}"`
+      }
+      return value
+    }
+    const csv = [headers.join(','), ...rows.map((row) => row.map((value) => escapeCsv(String(value))).join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -115,8 +123,8 @@ export default function DataExplorer() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Station</label>
-              <Select value={stationId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStationId(e.target.value)}>
+              <label htmlFor="station-select" className="text-sm font-medium">Station</label>
+              <Select id="station-select" value={stationId} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStationId(e.target.value)}>
                 <option value="">All stations</option>
                 {stations?.map((s: { id: string; name: string }) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -124,8 +132,8 @@ export default function DataExplorer() {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Sensor Type</label>
-              <Select value={sensorType} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSensorType(e.target.value as SensorType)}>
+              <label htmlFor="sensor-select" className="text-sm font-medium">Sensor Type</label>
+              <Select id="sensor-select" value={sensorType} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSensorType(e.target.value as SensorType)}>
                 <option value="">All types</option>
                 {sensorOptions.map((t) => (
                   <option key={t} value={t}>{capitalize(t)}</option>
@@ -133,12 +141,12 @@ export default function DataExplorer() {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Start Date</label>
-              <Input type="datetime-local" value={start} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStart(e.target.value)} />
+              <label htmlFor="start-date" className="text-sm font-medium">Start Date</label>
+              <Input id="start-date" type="datetime-local" value={start} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStart(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">End Date</label>
-              <Input type="datetime-local" value={end} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnd(e.target.value)} />
+              <label htmlFor="end-date" className="text-sm font-medium">End Date</label>
+              <Input id="end-date" type="datetime-local" value={end} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEnd(e.target.value)} />
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -150,9 +158,10 @@ export default function DataExplorer() {
               <Download className="mr-2 h-4 w-4" />
               Export CSV
             </Button>
+            {dateError && <div role="alert" className="w-full text-sm text-red-400">{dateError}</div>}
             <div className="ml-auto flex items-center gap-2">
-              <label className="text-sm text-muted-foreground">Per page:</label>
-              <Select value={String(limit)} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLimitChange(Number(e.target.value))}>
+              <label htmlFor="limit-select" className="text-sm text-muted-foreground">Per page:</label>
+              <Select id="limit-select" value={String(limit)} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleLimitChange(Number(e.target.value))}>
                 {limitOptions.map((opt) => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}

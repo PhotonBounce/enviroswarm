@@ -108,6 +108,16 @@ class StationUpdateRequest(BaseModel):
             raise ValueError(f"Invalid status: {v}. Must be one of: active, inactive, maintenance")
         return v
 
+    @field_validator("longitude", mode="after")
+    @classmethod
+    def validate_latitude_longitude(cls, v: Optional[float], info) -> Optional[float]:
+        data = info.data
+        lat = data.get("latitude")
+        lon = v
+        if (lat is not None) != (lon is not None):
+            raise ValueError("latitude and longitude must both be set or both be omitted")
+        return v
+
 
 class StationCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -246,7 +256,7 @@ class ApiKeyCreateRequest(BaseModel):
     permissions: Optional[Dict[str, bool]] = None
     expires_at: Optional[datetime] = None
 
-    @field_validator("expires_at", mode="before")
+    @field_validator("expires_at", mode="after")
     @classmethod
     def validate_expires_at(cls, v: Optional[datetime]) -> Optional[datetime]:
         if v is None:

@@ -31,6 +31,7 @@ export function Tabs({ value: controlledValue, defaultValue, onValueChange, chil
 }
 
 
+export function TabsList({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div role="tablist" className={cn('inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground', className)} {...props}>
       {children}

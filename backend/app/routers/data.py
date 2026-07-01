@@ -95,7 +95,7 @@ async def query_data(
         data = [
             {
                 "bucket": r.bucket.isoformat() if r.bucket else None,
-                "avg_value": round(r.avg_value, 6) if r.avg_value else None,
+                "avg_value": round(r.avg_value, 6) if r.avg_value is not None else None,
                 "min_value": r.min_value,
                 "max_value": r.max_value,
                 "count": r.count,
@@ -199,7 +199,7 @@ async def nearby(
             )
             nearby_stations.append(item.model_dump(mode="json"))
 
-    nearby_stations.sort(key=lambda x: x["distance_km"] or float("inf"))
+    nearby_stations.sort(key=lambda x: x["distance_km"])
     return StandardResponse(data=nearby_stations)
 
 
