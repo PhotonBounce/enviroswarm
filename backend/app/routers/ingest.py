@@ -110,7 +110,7 @@ async def ingest(
                 SensorStation.user_id == user.id,
                 SensorStation.deleted_at.is_(None),
                 SensorReading.deleted_at.is_(None),
-                SensorReading.timestamp >= today_start,
+                SensorReading.updated_at >= today_start,
             )
         )
         today_count = count_result.scalar_one()

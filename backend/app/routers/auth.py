@@ -36,7 +36,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 settings = get_settings()
 
-_DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt())
+_DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt(rounds=4)).decode("utf-8")
 
 
 # Cookie settings for web clients
@@ -152,7 +152,7 @@ async def login(
     user = result.scalar_one_or_none()
     if not user:
         # Dummy hash check to equalize timing and prevent email enumeration
-        verify_password(body.password, _DUMMY_HASH.decode("utf-8"))
+        verify_password(body.password, _DUMMY_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
@@ -254,8 +254,20 @@ async def logout(
     # Always clear cookies if they exist in the request
     had_cookies = bool(request.cookies.get("access_token") or request.cookies.get("refresh_token"))
     if had_cookies:
-        response.delete_cookie(COOKIE_SETTINGS["key"])
-        response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
+        response.delete_cookie(
+            COOKIE_SETTINGS["key"],
+            path="/",
+            secure=COOKIE_SETTINGS["secure"],
+            httponly=COOKIE_SETTINGS["httponly"],
+            samesite=COOKIE_SETTINGS["samesite"],
+        )
+        response.delete_cookie(
+            REFRESH_COOKIE_SETTINGS["key"],
+            path="/",
+            secure=REFRESH_COOKIE_SETTINGS["secure"],
+            httponly=REFRESH_COOKIE_SETTINGS["httponly"],
+            samesite=REFRESH_COOKIE_SETTINGS["samesite"],
+        )
 
     # Try access token from header or cookie
     auth_header = request.headers.get("Authorization", "")

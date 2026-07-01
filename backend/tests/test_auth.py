@@ -29,7 +29,7 @@ async def test_register_and_login(client: AsyncClient):
         "email": "test@example.com",
         "password": "Password123"
     })
-    assert r.status_code == 200
+    assert r.status_code == 201
     data = r.json()
     assert data["success"] is True
     assert data["data"]["email"] == "test@example.com"
