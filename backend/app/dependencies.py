@@ -104,8 +104,9 @@ def extract_api_key(request: Request, x_api_key: Optional[str] = None) -> Option
     auth = request.headers.get("Authorization", "")
     if auth.lower().startswith("bearer "):
         token = auth[7:].strip()
+        token_lower = token.lower()
         # API keys are 64 hex chars; JWTs are longer and contain dots
-        if len(token) == 64 and all(c in "0123456789abcdef" for c in token.lower()):
+        if len(token) == 64 and all(c in "0123456789abcdef" for c in token_lower):
             return token
     return None
 
@@ -247,7 +248,7 @@ async def rate_limit_dependency(
 
     # Perform auth if not already cached
     if user is None:
-        user = await get_current_user_or_api_key(request, x_api_key=None, db=db)
+        user = await get_current_user_or_api_key(request, x_api_key=request.headers.get("X-API-Key"), db=db)
 
     return user
 

@@ -121,6 +121,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"success": False, "data": None, "error": exc.errors()},
+    )
+
+
 # Global exception handler — never leak internal details in production
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -134,11 +142,14 @@ async def global_exception_handler(request: Request, exc: Exception):
         exc_info=True,
     )
     if settings.is_production:
-        return JSONResponse(
+        response = JSONResponse(
             status_code=500,
             content={"success": False, "data": None, "error": "Internal server error"},
         )
-    return JSONResponse(
-        status_code=500,
-        content={"success": False, "data": None, "error": str(exc)},
-    )
+    else:
+        response = JSONResponse(
+            status_code=500,
+            content={"success": False, "data": None, "error": str(exc)},
+        )
+    response.headers["X-Request-ID"] = request_id
+    return response
