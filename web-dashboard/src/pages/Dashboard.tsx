@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Radio, BarChart3, Zap } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -9,11 +9,19 @@ import type { SensorStation } from '@/types'
 export default function Dashboard() {
   const { data: stations, isLoading, error } = useStations()
 
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const onFocus = () => setRefreshKey((k) => k + 1)
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
   const today = useMemo(() => {
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     return d.toISOString()
-  }, [])
+  }, [refreshKey])
 
   const now = useMemo(() => new Date().toISOString(), [])
 

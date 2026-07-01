@@ -55,7 +55,6 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
   }, [data])
 
   const ChartComponent = type === 'area' ? AreaChart : LineChart
-  const DataComponent = type === 'area' ? Area : Line
 
   return (
     <ResponsiveContainer width="100%" height={320}>

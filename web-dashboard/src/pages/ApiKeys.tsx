@@ -149,50 +149,48 @@ export default function ApiKeys() {
         </Card>
       )}
 
-      {dialogOpen && (
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogHeader>
-            <DialogTitle>Generate API Key</DialogTitle>
-            <DialogDescription>Create a new API key for programmatic access</DialogDescription>
-          </DialogHeader>
-          {newKey ? (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-emerald-600/30 bg-emerald-900/20 p-4">
-                <p className="text-sm font-medium text-emerald-400 mb-2">Your new API key (raw key):</p>
-                <code className="block break-all rounded bg-muted p-2 text-xs font-mono">{newKey}</code>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Copy this raw key now — it is shown only once. The key list below displays hashed values for security.
-                </p>
-              </div>
-              <DialogFooter>
-                <Button onClick={() => handleCopy(newKey, 'new')}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy to Clipboard
-                </Button>
-                <Button variant="outline" onClick={() => { setDialogOpen(false); setNewKey(null) }}>
-                  Done
-                </Button>
-              </DialogFooter>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogHeader>
+          <DialogTitle>Generate API Key</DialogTitle>
+          <DialogDescription>Create a new API key for programmatic access</DialogDescription>
+        </DialogHeader>
+        {newKey ? (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-emerald-600/30 bg-emerald-900/20 p-4">
+              <p className="text-sm font-medium text-emerald-400 mb-2">Your new API key (raw key):</p>
+              <code className="block break-all rounded bg-muted p-2 text-xs font-mono">{newKey}</code>
+              <p className="text-xs text-muted-foreground mt-2">
+                Copy this raw key now — it is shown only once. The key list below displays hashed values for security.
+              </p>
             </div>
-          ) : (
-            <form onSubmit={handleCreate} className="space-y-4">
-              {createError && <p className="text-sm text-red-400">{createError}</p>}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Key Name</label>
-                <Input value={keyName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeyName(e.target.value)} placeholder="e.g. Production App" required />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createApiKey.isPending}>
-                  {createApiKey.isPending ? 'Generating...' : 'Generate'}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </Dialog>
-      )}
+            <DialogFooter>
+              <Button onClick={() => handleCopy(newKey, 'new')}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy to Clipboard
+              </Button>
+              <Button variant="outline" onClick={() => { setDialogOpen(false); setNewKey(null) }}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <form onSubmit={handleCreate} className="space-y-4">
+            {createError && <p className="text-sm text-red-400">{createError}</p>}
+            <div className="space-y-2">
+              <label htmlFor="key-name" className="text-sm font-medium">Key Name</label>
+              <Input id="key-name" value={keyName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setKeyName(e.target.value)} placeholder="e.g. Production App" required />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createApiKey.isPending}>
+                {createApiKey.isPending ? 'Generating...' : 'Generate'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </Dialog>
     </div>
   )
 }

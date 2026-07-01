@@ -1,6 +1,5 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
-import asyncio
 import hmac
 import time
 import uuid
@@ -21,11 +20,6 @@ from app.constants import RATE_LIMITS
 # Database-backed rate limiting
 # ---------------------------------------------------------------------------
 
-_rate_limit_store: dict = {}
-_rate_limit_lock = asyncio.Lock()
-
-_MAX_RATE_LIMIT_ENTRIES = 100_000
-
 
 def _get_rate_limit_key(identifier: str, route: str) -> str:
     return f"{identifier}:{route}"
@@ -39,7 +33,7 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
 
     async with get_sessionmaker()() as session:
         result = await session.execute(
-            select(RateLimitEntry).where(RateLimitEntry.key == key)
+            select(RateLimitEntry).where(RateLimitEntry.key == key).with_for_update()
         )
         entry = result.scalar_one_or_none()
 

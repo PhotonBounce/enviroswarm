@@ -85,10 +85,14 @@ async def register(
     try:
         await db.commit()
         await db.refresh(user)
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
+        if hasattr(exc, "orig") and exc.orig and "uq_users_email" in str(exc.orig):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database integrity error"
         )
 
     return StandardResponse(

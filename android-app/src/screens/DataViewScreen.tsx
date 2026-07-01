@@ -60,8 +60,8 @@ export default function DataViewScreen({ route }: Props) {
       if (res.data?.success) {
         if (isMounted.current) setReadings(res.data.data || []);
       }
-    } catch (err: any) {
-      if (isMounted.current) Alert.alert('Error', err?.message || 'Failed to load data');
+    } catch (err: unknown) {
+      if (isMounted.current) Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       if (isMounted.current) setLoading(false);
     }
@@ -84,11 +84,12 @@ export default function DataViewScreen({ route }: Props) {
     const fn = (type: SensorType) => {
       const items = groupedByType[type]?.slice(-20) || [];
       if (items.length < 2) return null;
+      const validItems = items.filter(r => Number.isFinite(r.value));
       return {
-        labels: items.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
+        labels: validItems.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
         datasets: [
           {
-            data: items.filter(r => Number.isFinite(r.value)).map((r) => r.value),
+            data: validItems.map((r) => r.value),
             color: () => '#10b981',
             strokeWidth: 2,
           },

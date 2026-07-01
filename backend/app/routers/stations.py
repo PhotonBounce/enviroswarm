@@ -37,7 +37,7 @@ async def create_station(
             SensorStation.user_id == user.id, SensorStation.deleted_at.is_(None)
         )
     )
-    existing_count = result.scalar_one() or 0
+    existing_count = result.scalar_one()
     tier_limits = STATION_TIER_LIMITS
     if existing_count >= tier_limits.get(user.tier, 1):
         raise HTTPException(
@@ -136,8 +136,10 @@ async def update_station(
 
     if body.name is not None:
         station.name = body.name
-    station.latitude = body.latitude
-    station.longitude = body.longitude
+    if "latitude" in body.model_fields_set:
+        station.latitude = body.latitude
+    if "longitude" in body.model_fields_set:
+        station.longitude = body.longitude
     if body.sensor_types is not None:
         station.sensor_types = body.sensor_types
     if body.status is not None:

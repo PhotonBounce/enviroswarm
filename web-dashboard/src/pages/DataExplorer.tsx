@@ -86,7 +86,7 @@ export default function DataExplorer() {
       r.timestamp,
       r.station_id,
       r.sensor_type,
-      String(r.value),
+      String(Number.isFinite(r.value) ? r.value : '—'),
       r.unit,
     ])
     const escapeCsv = (value: string) => {

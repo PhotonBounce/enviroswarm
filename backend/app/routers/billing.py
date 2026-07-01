@@ -68,7 +68,7 @@ async def subscribe(
         )
 
     # Lock user row to prevent race condition on duplicate active subscriptions.
-    # TODO: Add DB migration: CREATE UNIQUE INDEX uq_active_subscription ON subscriptions(user_id) WHERE deleted_at IS NULL AND end_date >= NOW()
+    # TODO migration: CREATE UNIQUE INDEX uq_active_subscription ON subscriptions(user_id) WHERE deleted_at IS NULL AND end_date >= NOW()
     await db.execute(select(User).where(User.id == user.id).with_for_update())
 
     # Check for existing active subscription

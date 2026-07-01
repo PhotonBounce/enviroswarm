@@ -29,8 +29,8 @@ export default function SubmitReadingScreen() {
       if (res.data?.success) {
         setStations(res.data.data || []);
       }
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load stations');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load stations');
     } finally {
       setRefreshing(false);
     }
@@ -70,8 +70,8 @@ export default function SubmitReadingScreen() {
       } else {
         Alert.alert('Error', res.data?.error || 'Submission failed');
       }
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Submission failed');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Submission failed');
     } finally {
       setLoading(false);
     }

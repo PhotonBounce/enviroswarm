@@ -216,6 +216,10 @@ class RevokedToken(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+    __table_args__ = (
+        Index("ix_revoked_tokens_expires_at", "expires_at"),
+    )
+
 
 class RateLimitEntry(Base):
     """Database-backed rate limit entry store."""
@@ -225,6 +229,10 @@ class RateLimitEntry(Base):
     count: Mapped[int] = mapped_column(default=0, nullable=False)
     window_start: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_rate_limit_entries_window_start", "window_start"),
     )
 
 

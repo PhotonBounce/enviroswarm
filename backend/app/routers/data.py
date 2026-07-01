@@ -103,7 +103,7 @@ async def query_data(
         rows = result.all()
         data = [
             {
-                "bucket": r.bucket.isoformat() if r.bucket else None,
+                "bucket": r.bucket.isoformat() if isinstance(r.bucket, datetime) else r.bucket,
                 "avg_value": round(r.avg_value, 6) if r.avg_value is not None else None,
                 "min_value": r.min_value,
                 "max_value": r.max_value,

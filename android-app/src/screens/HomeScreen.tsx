@@ -44,9 +44,9 @@ export default function HomeScreen({ navigation }: Props) {
       if (res.data?.success && requestId === requestIdRef.current) {
         setStations(res.data.data || []);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (requestId === requestIdRef.current) {
-        Alert.alert('Error', err?.message || 'Failed to fetch nearby stations');
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to fetch nearby stations');
       }
     } finally {
       if (requestId === requestIdRef.current) {

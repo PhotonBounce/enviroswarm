@@ -44,8 +44,8 @@ export default function StationsScreen({ navigation }: Props) {
       if (res.data?.success) {
         setStations(res.data.data || []);
       }
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load stations');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to load stations');
     } finally {
       setRefreshing(false);
     }
@@ -101,8 +101,8 @@ export default function StationsScreen({ navigation }: Props) {
       } else {
         Alert.alert('Error', res.data?.error || 'Failed to create station');
       }
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to create station');
+    } catch (err: unknown) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create station');
     } finally {
       setIsCreating(false);
     }

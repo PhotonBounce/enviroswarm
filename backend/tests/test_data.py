@@ -7,7 +7,6 @@ from datetime import datetime, timezone, timedelta
 
 from app.main import app
 from app.database import get_engine, Base
-from app.dependencies import _rate_limit_store
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -15,7 +14,6 @@ async def reset_db():
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    _rate_limit_store.clear()
     yield
 
 
@@ -154,3 +152,42 @@ async def test_query_data_with_api_key(data_client: AsyncClient):
         # No write permission → 403 on ingest (handled by ingest router, not data router)
         r = await ac.get("/api/v1/data/nearby?lat=40.0&lon=-74.0&radius_km=10")
         assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_query_data_aggregate_hour(data_client: AsyncClient):
+    r = await data_client.get("/api/v1/data?aggregate=hour")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success"] is True
+    assert isinstance(data["data"], list)
+    if data["data"]:
+        assert "bucket" in data["data"][0]
+        assert "avg_value" in data["data"][0]
+        assert "min_value" in data["data"][0]
+        assert "max_value" in data["data"][0]
+        assert "count" in data["data"][0]
+        assert "sensor_type" in data["data"][0]
+        assert "unit" in data["data"][0]
+
+
+@pytest.mark.asyncio
+async def test_query_data_aggregate_day(data_client: AsyncClient):
+    r = await data_client.get("/api/v1/data?aggregate=day")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success"] is True
+    assert isinstance(data["data"], list)
+    if data["data"]:
+        assert "bucket" in data["data"][0]
+
+
+@pytest.mark.asyncio
+async def test_query_data_aggregate_month(data_client: AsyncClient):
+    r = await data_client.get("/api/v1/data?aggregate=month")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success"] is True
+    assert isinstance(data["data"], list)
+    if data["data"]:
+        assert "bucket" in data["data"][0]

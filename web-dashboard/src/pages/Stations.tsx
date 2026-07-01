@@ -119,59 +119,57 @@ export default function Stations() {
         </Card>
       )}
 
-      {dialogOpen && (
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogHeader>
-            <DialogTitle>Create New Station</DialogTitle>
-            <DialogDescription>Add a new sensor station to your network</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogHeader>
+          <DialogTitle>Create New Station</DialogTitle>
+          <DialogDescription>Add a new sensor station to your network</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="station-name" className="text-sm font-medium">Station Name</label>
+            <Input id="station-name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="e.g. Park Air Monitor" required />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Station Name</label>
-              <Input value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="e.g. Park Air Monitor" required />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Latitude</label>
-                <Input value={latitude} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLatitude(e.target.value)} placeholder="40.7128" type="number" step="any" required />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Longitude</label>
-                <Input value={longitude} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLongitude(e.target.value)} placeholder="-74.0060" type="number" step="any" required />
-              </div>
+              <label htmlFor="latitude" className="text-sm font-medium">Latitude</label>
+              <Input id="latitude" value={latitude} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLatitude(e.target.value)} placeholder="40.7128" type="number" step="any" required />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Sensor Types</label>
-              <div className="flex flex-wrap gap-2">
-                {sensorOptions.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => toggleSensor(type)}
-                    aria-pressed={selectedSensors.includes(type)}
-                    className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
-                      selectedSensors.includes(type)
-                        ? 'border-emerald-600 bg-emerald-900/30 text-emerald-400'
-                        : 'border-border hover:bg-muted'
-                    }`}
-                  >
-                    {capitalize(type)}
-                  </button>
-                ))}
-              </div>
+              <label htmlFor="longitude" className="text-sm font-medium">Longitude</label>
+              <Input id="longitude" value={longitude} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLongitude(e.target.value)} placeholder="-74.0060" type="number" step="any" required />
             </div>
-            {formError && <p className="text-sm text-red-400">{formError}</p>}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createStation.isPending}>
-                {createStation.isPending ? 'Creating...' : 'Create Station'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Dialog>
-      )}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Sensor Types</label>
+            <div className="flex flex-wrap gap-2">
+              {sensorOptions.map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleSensor(type)}
+                  aria-pressed={selectedSensors.includes(type)}
+                  className={`rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                    selectedSensors.includes(type)
+                      ? 'border-emerald-600 bg-emerald-900/30 text-emerald-400'
+                      : 'border-border hover:bg-muted'
+                  }`}
+                >
+                  {capitalize(type)}
+                </button>
+              ))}
+            </div>
+          </div>
+          {formError && <p className="text-sm text-red-400">{formError}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={createStation.isPending}>
+              {createStation.isPending ? 'Creating...' : 'Create Station'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
     </div>
   )
 }

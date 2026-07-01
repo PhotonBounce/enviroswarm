@@ -103,9 +103,9 @@ async def health() -> dict:
         return {"success": True, "data": {"status": "ok", "version": "1.0.0"}}
     except Exception as exc:
         logger.error("Health check DB ping failed: %s", exc)
-        return JSONResponse(
+        raise HTTPException(
             status_code=503,
-            content={"success": False, "data": {"status": "unhealthy", "version": "1.0.0"}, "error": "Database unavailable"},
+            detail="Database unavailable",
         )
 
 
