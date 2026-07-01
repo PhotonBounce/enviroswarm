@@ -63,6 +63,7 @@ async def ingest(
             select(SensorStation).where(
                 SensorStation.id.in_(station_ids),
                 SensorStation.user_id == user.id,
+                SensorStation.status == "active",
                 SensorStation.deleted_at.is_(None),
             )
         )
