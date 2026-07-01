@@ -1,5 +1,7 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
+import logging
+
 import hmac
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -16,6 +18,8 @@ from app.models import ApiKey, IdempotencyKey, RateLimitEntry, User
 from app.auth import decode_access_token
 from app.utils.crypto import hash_key, extract_prefix
 from app.constants import RATE_LIMITS
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Database-backed rate limiting
@@ -100,14 +104,14 @@ async def cleanup_idempotency_keys() -> None:
 
 def extract_api_key(request: Request, x_api_key: Optional[str] = None) -> Optional[str]:
     if x_api_key:
-        return x_api_key
+        return x_api_key.lower()
     auth = request.headers.get("Authorization", "")
     if auth.lower().startswith("bearer "):
         token = auth[7:].strip()
         token_lower = token.lower()
         # API keys are 64 hex chars; JWTs are longer and contain dots
         if len(token) == 64 and all(c in "0123456789abcdef" for c in token_lower):
-            return token
+            return token.lower()
     return None
 
 
@@ -155,7 +159,7 @@ async def get_current_user_or_api_key(
                         )
                         await session.commit()
                 except Exception:
-                    pass  # Silently fail; last_used_at is best-effort
+                    logger.warning("Failed to update API key last_used_at", exc_info=True)
                 user_result = await db.execute(
                     select(User).where(
                         User.id == api_key.user_id,
