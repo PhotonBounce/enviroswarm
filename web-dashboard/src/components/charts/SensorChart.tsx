@@ -40,10 +40,12 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
       if (!timestamps.has(ts)) timestamps.set(ts, {})
       timestamps.get(ts)![r.sensor_type] = r.value
     }
-    return Array.from(timestamps.entries()).map(([timestamp, values]) => ({
-      timestamp,
-      ...values,
-    }))
+    return Array.from(timestamps.entries())
+      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .map(([timestamp, values]) => ({
+        timestamp,
+        ...values,
+      }))
   }, [data])
 
   const types = useMemo(() => {

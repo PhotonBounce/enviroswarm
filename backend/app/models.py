@@ -46,13 +46,13 @@ class User(Base):
     )
 
     stations: Mapped[List["SensorStation"]] = relationship(
-        "SensorStation", back_populates="owner", lazy="select"
+        "SensorStation", back_populates="owner"
     )
     api_keys: Mapped[List["ApiKey"]] = relationship(
-        "ApiKey", back_populates="owner", lazy="select"
+        "ApiKey", back_populates="owner"
     )
     subscriptions: Mapped[List["Subscription"]] = relationship(
-        "Subscription", back_populates="owner", lazy="select"
+        "Subscription", back_populates="owner"
     )
 
     __table_args__ = (
@@ -86,7 +86,7 @@ class SensorStation(Base):
 
     owner: Mapped[User] = relationship("User", back_populates="stations")
     readings: Mapped[List["SensorReading"]] = relationship(
-        "SensorReading", back_populates="station", lazy="select", cascade="all, delete-orphan"
+        "SensorReading", back_populates="station", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -203,6 +203,28 @@ class Subscription(Base):
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_sub_tier"),
         CheckConstraint("payment_status IN ('pending', 'active', 'failed', 'cancelled')", name="ck_sub_payment_status"),
+    )
+
+
+class RevokedToken(Base):
+    """Database-backed refresh token revocation store."""
+    __tablename__ = "revoked_tokens"
+
+    jti: Mapped[str] = mapped_column(String(255), primary_key=True)
+    revoked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class RateLimitEntry(Base):
+    """Database-backed rate limit entry store."""
+    __tablename__ = "rate_limit_entries"
+
+    key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    count: Mapped[int] = mapped_column(default=0, nullable=False)
+    window_start: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
 
 

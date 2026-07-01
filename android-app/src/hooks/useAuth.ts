@@ -14,7 +14,6 @@ export function useAuth() {
       const token = await SecureStore.getItemAsync('access_token');
       if (!token) {
         setUser(null);
-        setLoading(false);
         return null;
       }
       const res = await apiClient.get<ApiResponse<User>>('/me');

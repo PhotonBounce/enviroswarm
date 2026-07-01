@@ -88,7 +88,7 @@ export default function DataViewScreen({ route }: Props) {
         labels: items.map((r) => new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })),
         datasets: [
           {
-            data: items.map((r) => r.value),
+            data: items.filter(r => Number.isFinite(r.value)).map((r) => r.value),
             color: () => '#10b981',
             strokeWidth: 2,
           },

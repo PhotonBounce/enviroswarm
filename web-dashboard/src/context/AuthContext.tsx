@@ -1,6 +1,7 @@
 import { createContext, useState, useCallback, useEffect } from 'react'
 import type { User, UserTier } from '@/types'
 import api from '@/lib/api'
+import { AxiosError } from 'axios'
 
 interface AuthContextType {
   user: User | null
@@ -34,8 +35,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (response.data?.success) {
           setUserState(response.data.data)
         }
-      } catch (err: any) {
-        if (err?.response?.status === 401) {
+      } catch (err: unknown) {
+        if (err instanceof AxiosError && err.response?.status === 401) {
           setUserState(null)
         }
       } finally {

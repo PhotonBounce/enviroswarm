@@ -12,11 +12,13 @@ interface TabsProps {
 const TabsContext = React.createContext<{
   value?: string
   onValueChange: (value: string) => void
-}>({ onValueChange: () => {} })
+  idPrefix: string
+}>({ onValueChange: () => {}, idPrefix: '' })
 
 export function Tabs({ value: controlledValue, defaultValue, onValueChange, children }: TabsProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const value = controlledValue !== undefined ? controlledValue : internalValue
+  const [idPrefix] = useState(() => Math.random().toString(36).slice(2, 9))
 
   const handleChange = (newValue: string) => {
     setInternalValue(newValue)
@@ -24,7 +26,7 @@ export function Tabs({ value: controlledValue, defaultValue, onValueChange, chil
   }
 
   return (
-    <TabsContext.Provider value={{ value, onValueChange: handleChange }}>
+    <TabsContext.Provider value={{ value, onValueChange: handleChange, idPrefix }}>
       <div className="w-full">{children}</div>
     </TabsContext.Provider>
   )
@@ -45,12 +47,16 @@ export function TabsTrigger({
   children,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }) {
-  const { value: selectedValue, onValueChange } = React.useContext(TabsContext)
+  const { value: selectedValue, onValueChange, idPrefix } = React.useContext(TabsContext)
   const isActive = selectedValue === value
+  const tabId = `${idPrefix}-tab-${value}`
+  const panelId = `${idPrefix}-panel-${value}`
 
   return (
     <button
       role="tab"
+      id={tabId}
+      aria-controls={panelId}
       aria-selected={isActive}
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
@@ -71,11 +77,13 @@ export function TabsContent({
   children,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { value: string }) {
-  const { value: selectedValue } = React.useContext(TabsContext)
+  const { value: selectedValue, idPrefix } = React.useContext(TabsContext)
   if (selectedValue !== value) return null
+  const tabId = `${idPrefix}-tab-${value}`
+  const panelId = `${idPrefix}-panel-${value}`
 
   return (
-    <div role="tabpanel" className={cn('mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', className)} {...props}>
+    <div role="tabpanel" id={panelId} aria-labelledby={tabId} className={cn('mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', className)} {...props}>
       {children}
     </div>
   )

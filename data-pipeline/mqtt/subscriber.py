@@ -18,11 +18,7 @@ except ImportError:
     mqtt = None
 
 import requests
-from urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
 
-API_BASE = "http://localhost:8000"
-TOPIC_PREFIX = "enviroswarm/sensors/#"
 
 
 def _safe_int(env_var: str, default: int) -> int:
@@ -117,7 +113,7 @@ def _post_with_retry(
             else:
                 print(f"[MQTT Sub] API error {resp.status_code}: {resp.text[:200]}")
                 return False
-        except requests.RequestException as e:
+        except (requests.ConnectionError, requests.Timeout) as e:
             if attempt < max_retries:
                 wait = min(2 ** attempt, 8)
                 print(f"[MQTT Sub] API request failed (attempt {attempt + 1}), retrying in {wait}s: {e}")
@@ -125,6 +121,8 @@ def _post_with_retry(
             else:
                 print(f"[MQTT Sub] API request failed after {max_retries + 1} attempts: {e}")
                 return False
+        except requests.RequestException:
+            raise
     return False
 
 
@@ -211,8 +209,11 @@ def _drain_and_shutdown(q: queue.Queue, worker_thread: threading.Thread, client,
         time.sleep(0.05)
     remaining = time.monotonic() - drain_start
     worker_thread.join(timeout=max(0.0, timeout - remaining))
-    client.disconnect()
-    client.loop_stop()
+    try:
+        client.disconnect()
+        client.loop_stop()
+    except Exception as e:
+        print(f"[MQTT Sub] Warning: cleanup error during disconnect/loop_stop: {e}")
     print("[MQTT Sub] Shutdown complete.")
 
 
@@ -287,7 +288,7 @@ def start_subscriber(
     else:
         print("[MQTT Sub] WARNING: No auth_token provided. API requests may fail with 401.")
 
-    if run_duration_seconds:
+    if run_duration_seconds is not None:
         try:
             time.sleep(run_duration_seconds)
         except KeyboardInterrupt:
@@ -377,6 +378,8 @@ def main():
         raise ValueError("ingest_timeout must be > 0")
     if args.max_retries < 0:
         raise ValueError("max_retries must be >= 0")
+    if args.run_duration is not None and args.run_duration < 0:
+        raise ValueError("run_duration must be >= 0")
 
     start_subscriber(
         broker_host=args.broker_host,

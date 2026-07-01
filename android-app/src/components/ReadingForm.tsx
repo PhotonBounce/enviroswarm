@@ -41,13 +41,13 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
 
   const handleSubmit = () => {
     const numValue = parseFloat(value);
-    if (isNaN(numValue)) {
+    if (!Number.isFinite(numValue)) {
       Alert.alert('Invalid Input', 'Please enter a valid numeric value.');
       return;
     }
     const numLat = lat !== '' ? parseFloat(lat) : undefined;
     const numLon = lon !== '' ? parseFloat(lon) : undefined;
-    if ((numLat !== undefined && isNaN(numLat)) || (numLon !== undefined && isNaN(numLon))) {
+    if ((numLat !== undefined && !Number.isFinite(numLat)) || (numLon !== undefined && !Number.isFinite(numLon))) {
       Alert.alert('Invalid Input', 'Please enter valid coordinates.');
       return;
     }

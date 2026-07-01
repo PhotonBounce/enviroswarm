@@ -79,11 +79,11 @@ export default function StationsScreen({ navigation }: Props) {
     }
     const latVal = lat.trim() !== '' ? parseFloat(lat) : null;
     const lonVal = lon.trim() !== '' ? parseFloat(lon) : null;
-    if (lat.trim() === '' || isNaN(latVal ?? NaN)) {
+    if (lat.trim() === '' || !Number.isFinite(latVal)) {
       Alert.alert('Validation', 'Latitude must be a valid number');
       return;
     }
-    if (lon.trim() === '' || isNaN(lonVal ?? NaN)) {
+    if (lon.trim() === '' || !Number.isFinite(lonVal)) {
       Alert.alert('Validation', 'Longitude must be a valid number');
       return;
     }
@@ -141,6 +141,8 @@ export default function StationsScreen({ navigation }: Props) {
       <TouchableOpacity
         style={[styles.fab, { bottom: 20 + insets.bottom }]}
         onPress={openCreateModal}
+        accessibilityLabel="Create new station"
+        accessibilityRole="button"
       >
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>

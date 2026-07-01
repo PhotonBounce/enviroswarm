@@ -53,7 +53,11 @@ export default function SubmitReadingScreen() {
     setLoading(true);
     try {
       const payload = {
-        ...data,
+        station_id: data.station_id,
+        sensor_type: data.sensor_type,
+        value: data.value,
+        unit: data.unit,
+        timestamp: new Date().toISOString(),
         metadata: {
           ...(data.lat !== undefined && data.lat !== null ? { lat: data.lat } : {}),
           ...(data.lon !== undefined && data.lon !== null ? { lon: data.lon } : {}),

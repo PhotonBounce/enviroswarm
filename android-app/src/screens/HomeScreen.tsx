@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,21 +31,27 @@ export default function HomeScreen({ navigation }: Props) {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+  const requestIdRef = useRef(0);
 
   const fetchNearby = async (lat: number, lon: number) => {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ lat: String(lat), lon: String(lon), radius_km: '10' });
       const res = await apiClient.get<ApiResponse<SensorStation[]>>(
         `/data/nearby?${params.toString()}`
       );
-      if (res.data?.success) {
+      if (res.data?.success && requestId === requestIdRef.current) {
         setStations(res.data.data || []);
       }
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to fetch nearby stations');
+      if (requestId === requestIdRef.current) {
+        Alert.alert('Error', err?.message || 'Failed to fetch nearby stations');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -62,7 +68,10 @@ export default function HomeScreen({ navigation }: Props) {
   }, [latitude, longitude]);
 
   const handleRefresh = async () => {
-    await getCurrentLocation();
+    const loc = await getCurrentLocation();
+    if (loc?.latitude != null && loc?.longitude != null) {
+      fetchNearby(loc.latitude, loc.longitude);
+    }
   };
 
   if (locLoading) {

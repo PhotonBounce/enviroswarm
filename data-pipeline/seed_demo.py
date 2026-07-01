@@ -87,6 +87,8 @@ def _unwrap(resp: requests.Response) -> Any:
         body = resp.json()
     except Exception:
         body = {}
+    if not isinstance(body, dict):
+        return body
     if not body.get("success", True):
         err = body.get("error", f"HTTP {resp.status_code}")
         raise RuntimeError(f"API error: {err}")
@@ -193,6 +195,8 @@ def list_stations(session: requests.Session, token: str, api_base: str) -> List[
         )
         resp.raise_for_status()
         body = resp.json()
+        if not isinstance(body, dict):
+            raise RuntimeError(f"API error: HTTP {resp.status_code}")
         if not body.get("success", True):
             err = body.get("error", f"HTTP {resp.status_code}")
             raise RuntimeError(f"API error: {err}")
@@ -663,6 +667,8 @@ def main():
         raise ValueError("batch_delay must be >= 0")
     if args.ingest_timeout <= 0:
         raise ValueError("ingest_timeout must be > 0")
+    if args.batch_size <= 0:
+        raise ValueError("batch_size must be > 0")
 
     summary = run_seed(
         dry_run=args.dry_run,

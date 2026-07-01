@@ -40,6 +40,9 @@ def publish_readings(
     if mqtt is None:
         raise ImportError("paho-mqtt is required. Install it: pip install paho-mqtt")
     
+    if readings is None:
+        readings = []
+    
     if broker_port <= 0:
         raise ValueError("broker_port must be > 0")
     if delay_seconds < 0:
