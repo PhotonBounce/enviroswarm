@@ -87,5 +87,8 @@ data-pipeline/
 ## Troubleshooting
 
 - **Backend not running**: Ensure `docker-compose up --build -d` is running in the `backend/` directory before running the full seeder.
-- **Auth failures**: The demo user is auto-created; if it already exists, the script will login instead.
-- **Rate limiting**: If you hit rate limits, increase `BATCH_DELAY` in `seed_demo.py` or reduce `BATCH_SIZE`.
+- **Auth failures**: The demo user is auto-created; if it already exists, the script will login instead. You can override credentials with `--email`, `--password`, and `--tier` flags.
+- **Rate limiting**: If you hit rate limits, increase `--batch-delay` or reduce `--batch-size`.
+- **Appending readings**: Use `--append` to add new readings to existing stations without creating duplicates.
+- **Cleanup**: Use `--cleanup` to delete demo stations created during the run. Note: only stations created in the current run are removed.
+- **Duration**: Use `--duration-months` to change the subscription duration (default: 1).

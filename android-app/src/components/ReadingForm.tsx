@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SensorType, SENSOR_TYPES, SENSOR_UNITS } from '../types';
 
@@ -40,7 +41,10 @@ export function ReadingForm({ stationId, initialLat, initialLon, onSubmit, loadi
 
   const handleSubmit = () => {
     const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
+    if (isNaN(numValue)) {
+      Alert.alert('Invalid Input', 'Please enter a valid numeric value.');
+      return;
+    }
     onSubmit({
       station_id: stationId,
       sensor_type: sensorType,

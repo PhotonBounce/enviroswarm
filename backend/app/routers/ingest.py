@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,10 +13,9 @@ from app.database import get_db
 from app.dependencies import get_current_user_or_api_key, rate_limit_dependency
 from app.models import SensorReading, SensorStation, User, IdempotencyKey
 from app.schemas import StandardResponse, IngestRequest, IngestResponse
+from app.constants import RETENTION_DAYS, READING_TIER_LIMITS, IDEMPOTENCY_TTL_SECONDS
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
-
-_IDEMPOTENCY_TTL = 300  # 5 minutes
 
 
 @router.post("", response_model=StandardResponse)
@@ -71,7 +70,7 @@ async def ingest(
             )
 
         # Validate sensor_type matches station configuration and timestamp bounds
-        retention_days = {"free": 7, "pro": 90, "enterprise": 730}
+        retention_days = RETENTION_DAYS
         max_retention = retention_days.get(user.tier, 7)
         now = datetime.now(timezone.utc)
         earliest_allowed = now - timedelta(days=max_retention)
@@ -109,7 +108,7 @@ async def ingest(
         )
         today_count = count_result.scalar_one() or 0
 
-        tier_limits = {"free": 100, "pro": 10000, "enterprise": 99999999}
+        tier_limits = READING_TIER_LIMITS
         if today_count + len(body.readings) > tier_limits.get(user.tier, 100):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -139,26 +138,33 @@ async def ingest(
                     user_id=user.id,
                     key_hash=key_hash,
                     response=result_data,
-                    expires_at=datetime.now(timezone.utc) + timedelta(seconds=_IDEMPOTENCY_TTL),
+                    expires_at=datetime.now(timezone.utc) + timedelta(seconds=IDEMPOTENCY_TTL_SECONDS),
                 )
             )
 
         await db.commit()
 
         return StandardResponse(data=result_data if idempotency_key else IngestResponse(inserted=len(readings)).model_dump(mode="json"))
-    except IntegrityError:
+    except IntegrityError as exc:
         await db.rollback()
         if idempotency_key and key_hash:
-            idem_result = await db.execute(
-                select(IdempotencyKey).where(
-                    IdempotencyKey.user_id == user.id,
-                    IdempotencyKey.key_hash == key_hash,
-                    IdempotencyKey.expires_at > datetime.now(timezone.utc),
+            # Narrow check: only mask as 409 if it's the idempotency unique constraint
+            if "uq_idempotency_user_key" in str(exc.orig):
+                idem_result = await db.execute(
+                    select(IdempotencyKey).where(
+                        IdempotencyKey.user_id == user.id,
+                        IdempotencyKey.key_hash == key_hash,
+                        IdempotencyKey.expires_at > datetime.now(timezone.utc),
+                    )
                 )
-            )
-            cached = idem_result.scalar_one_or_none()
-            if cached:
-                return StandardResponse(data=cached.response)
+                cached = idem_result.scalar_one_or_none()
+                if cached:
+                    return StandardResponse(data=cached.response)
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database integrity error",
+                ) from exc
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Idempotency conflict or duplicate key",

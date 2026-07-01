@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Dimensions,
+  useWindowDimensions,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
@@ -26,8 +26,6 @@ interface Props {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DataView'>;
 }
 
-const screenWidth = Dimensions.get('window').width - 32;
-
 export default function DataViewScreen({ route }: Props) {
   const params = route.params;
   if (!params?.stationId || !params?.stationName) {
@@ -40,8 +38,10 @@ export default function DataViewScreen({ route }: Props) {
   const { stationId, stationName } = params;
   const [readings, setReadings] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sensorType, setSensorType] = useState<SensorType | 'all'>('all');
+  const [sensorType] = useState<SensorType | 'all'>('all');
   const isMounted = useRef(true);
+  const { width } = useWindowDimensions();
+  const screenWidth = width - 32;
 
   useEffect(() => {
     return () => {
@@ -49,7 +49,7 @@ export default function DataViewScreen({ route }: Props) {
     };
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const searchParams = new URLSearchParams({ station_id: stationId, limit: '100' });
@@ -65,11 +65,11 @@ export default function DataViewScreen({ route }: Props) {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  };
+  }, [stationId, sensorType]);
 
   useEffect(() => {
     fetchData();
-  }, [stationId, sensorType]);
+  }, [fetchData]);
 
   const groupedByType = useMemo(() => {
     const groups: Record<string, SensorReading[]> = {};

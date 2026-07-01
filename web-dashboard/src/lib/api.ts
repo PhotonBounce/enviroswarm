@@ -18,18 +18,15 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000,
+  withCredentials: true,  // Send httpOnly cookies with cross-origin requests
 })
 
-// CRITICAL SECURITY WARNING: Reading the JWT from sessionStorage and attaching it
-// to every request exposes the token to XSS. The long-term fix is to move to
-// httpOnly secure cookies managed by the backend, so the browser sends the
-// cookie automatically and the token is never accessible to JavaScript.
+// The backend uses httpOnly cookies for web auth. The browser sends
+// the cookie automatically via withCredentials: true.
+// Mobile/API clients configure their own axios instance with Authorization headers.
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('enviroswarm_token')
-    if (token && config.headers && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
+    // No manual token handling needed — httpOnly cookies are sent automatically
     return config
   },
   (error) => Promise.reject(error)
@@ -41,12 +38,9 @@ api.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => response,
   (error: AxiosError<ApiResponse<unknown>>) => {
     if (error.response?.status === 401) {
-      sessionStorage.removeItem('enviroswarm_token')
       if (!isRedirecting) {
         isRedirecting = true
-        // Emit a custom event so the SPA can handle navigation without a full reload
         window.dispatchEvent(new CustomEvent('enviroswarm:unauthorized'))
-        // Reset flag after a short delay to allow future re-auth attempts
         setTimeout(() => {
           isRedirecting = false
         }, 100)

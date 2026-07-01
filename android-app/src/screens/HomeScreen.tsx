@@ -91,7 +91,7 @@ export default function HomeScreen({ navigation }: Props) {
       <MapView
         style={{ width, height }}
         region={region}
-        onRegionChangeComplete={setRegion}
+        onRegionChangeComplete={(newRegion) => { setRegion(newRegion); fetchNearby(newRegion.latitude, newRegion.longitude); }}
         showsUserLocation
         showsMyLocationButton
       >

@@ -6,11 +6,11 @@ from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.dependencies import require_permission, rate_limit_dependency
 from app.models import SensorStation, SensorReading, User
 from app.schemas import StandardResponse, StationCreateRequest, StationUpdateRequest, StationResponse
+from app.constants import STATION_TIER_LIMITS
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -38,7 +38,7 @@ async def create_station(
         )
     )
     existing_count = result.scalar_one() or 0
-    tier_limits = {"free": 1, "pro": 10, "enterprise": 9999}
+    tier_limits = STATION_TIER_LIMITS
     if existing_count >= tier_limits.get(user.tier, 1):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

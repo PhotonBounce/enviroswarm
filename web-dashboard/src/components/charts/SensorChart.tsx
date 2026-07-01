@@ -92,7 +92,7 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
           }}
           formatter={(value: number, name: string) => [formatNumber(value, 2), name]}
         />
-        {showLegend && <Legend />}
+        {showLegend && <Legend wrapperStyle={{ maxHeight: 80, overflowY: 'auto' }} />}
         {types.map((sensorType) => (
           type === 'area' ? (
             <Area

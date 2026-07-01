@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, Bell, User, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -18,8 +18,41 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const location = useLocation()
+  const notificationRef = useRef<HTMLDivElement>(null)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
 
   const notificationCount = 0
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [notificationsOpen])
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+      const focusable = mobileMenuRef.current?.querySelectorAll<HTMLElement>('a[href], button')
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [mobileOpen])
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
@@ -37,7 +70,7 @@ export default function Header() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative">
+          <div className="relative" ref={notificationRef}>
             <button
               className="relative rounded-lg p-2 hover:bg-muted"
               onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -79,13 +112,14 @@ export default function Header() {
         </div>
       </div>
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-card">
+        <div className="md:hidden border-t border-border bg-card" ref={mobileMenuRef}>
           <nav className="flex flex-col p-2 space-y-1">
             {mobileNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
                 onClick={() => setMobileOpen(false)}
+                aria-current={location.pathname === item.path ? 'page' : undefined}
                 className={cn(
                   'rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                   location.pathname === item.path

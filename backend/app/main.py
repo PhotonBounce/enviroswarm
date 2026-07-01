@@ -27,13 +27,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # NOTE: In production, use Alembic migrations (`alembic upgrade head`)
     # instead of create_all. create_all does not handle schema migrations,
     # renames, or data migrations.
-    if settings.is_production:
+    if settings.environment.lower() == "development":
+        async with get_engine().begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    else:
         logger.warning(
-            "PRODUCTION WARNING: Base.metadata.create_all is being used. "
-            "Run 'alembic upgrade head' in your Docker entrypoint instead."
+            "PRODUCTION: Skipping Base.metadata.create_all. "
+            "Run 'alembic upgrade head' in your Docker entrypoint."
         )
-    async with get_engine().begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
     yield
     logger.info("Shutting down ENViroSwarm API...")
     await get_engine().dispose()
@@ -58,6 +59,18 @@ app.add_middleware(
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# Request ID middleware for upstream correlation
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID")
+    if not request_id:
+        request_id = str(uuid.uuid4())[:8]
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # API v1 routers

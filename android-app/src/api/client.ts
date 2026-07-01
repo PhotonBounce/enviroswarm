@@ -25,11 +25,15 @@ export const authEvents = {
   },
 };
 
+let cachedToken: string | null = null;
+
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await SecureStore.getItemAsync('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (cachedToken === null) {
+      cachedToken = await SecureStore.getItemAsync('access_token');
+    }
+    if (cachedToken) {
+      config.headers.Authorization = `Bearer ${cachedToken}`;
     }
     return config;
   },
@@ -40,6 +44,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401) {
+      cachedToken = null;
       await SecureStore.deleteItemAsync('access_token');
       authEvents.emitUnauthorized();
     }

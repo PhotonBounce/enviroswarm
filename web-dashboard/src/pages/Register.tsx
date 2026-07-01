@@ -23,13 +23,13 @@ export default function Register() {
       return
     }
     try {
-      const result = await registerMutation.mutateAsync({ email, password })
-      // Store token in sessionStorage so the axios interceptor can use it for /me
-      sessionStorage.setItem('enviroswarm_token', result.access_token)
+      await registerMutation.mutateAsync({ email, password })
+      // Cookie is set by backend (httpOnly). Browser sends it automatically.
+      // Fetch user profile.
       try {
         const userData = await api.get('/me')
         if (userData.data?.success) {
-          login(result.access_token, userData.data.data)
+          login(userData.data.data)
         } else {
           setError(userData.data?.error || 'Failed to load user')
         }

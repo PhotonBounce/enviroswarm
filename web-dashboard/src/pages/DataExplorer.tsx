@@ -90,7 +90,7 @@ export default function DataExplorer() {
     a.href = url
     a.download = 'sensor-data.csv'
     a.click()
-    URL.revokeObjectURL(url)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
@@ -208,7 +208,7 @@ export default function DataExplorer() {
                           <TableCell>
                             <Badge variant="outline">{capitalize(reading.sensor_type)}</Badge>
                           </TableCell>
-                          <TableCell className="font-mono">{reading.value.toFixed(3)}</TableCell>
+                          <TableCell className="font-mono">{typeof reading.value === 'number' ? reading.value.toFixed(3) : reading.value}</TableCell>
                           <TableCell>{reading.unit}</TableCell>
                         </TableRow>
                       ))}

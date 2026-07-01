@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Text, StyleSheet, View, ActivityIndicator, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuthContext } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
@@ -108,6 +108,7 @@ function RootNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
       <AuthProvider>
         <NavigationContainer>
           <RootNavigator />

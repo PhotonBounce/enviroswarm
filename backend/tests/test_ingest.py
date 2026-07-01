@@ -4,6 +4,8 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
+from datetime import datetime, timezone
+
 from app.main import app
 from app.database import get_engine, Base
 
@@ -52,7 +54,7 @@ async def test_ingest_data(auth_client: AsyncClient):
                 "sensor_type": "temperature",
                 "value": 22.5,
                 "unit": "C",
-                "timestamp": "2024-06-01T12:00:00Z",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "metadata": {"source": "test"}
             }
         ]

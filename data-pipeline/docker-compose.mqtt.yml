@@ -12,6 +12,11 @@ services:
       - ./mqtt/data:/mosquitto/data
       - ./mqtt/log:/mosquitto/log
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-p", "1883", "-t", "health", "-m", "check", "-d", "1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 # To start: docker-compose -f docker-compose.mqtt.yml up -d
 # To stop:  docker-compose -f docker-compose.mqtt.yml down

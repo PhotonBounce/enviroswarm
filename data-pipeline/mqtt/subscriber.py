@@ -23,9 +23,25 @@ from requests.adapters import HTTPAdapter
 
 API_BASE = "http://localhost:8000"
 TOPIC_PREFIX = "enviroswarm/sensors/#"
-DEFAULT_MAX_QUEUE_SIZE = int(os.getenv("MQTT_MAX_QUEUE_SIZE", "1000"))
-DEFAULT_INGEST_TIMEOUT = float(os.getenv("MQTT_INGEST_TIMEOUT", "10"))
-DEFAULT_INGEST_RETRY = int(os.getenv("MQTT_INGEST_RETRY", "3"))
+
+
+def _safe_int(env_var: str, default: int) -> int:
+    try:
+        return int(os.getenv(env_var, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(env_var: str, default: float) -> float:
+    try:
+        return float(os.getenv(env_var, str(default)))
+    except (ValueError, TypeError):
+        return default
+
+
+DEFAULT_MAX_QUEUE_SIZE = _safe_int("MQTT_MAX_QUEUE_SIZE", 1000)
+DEFAULT_INGEST_TIMEOUT = _safe_float("MQTT_INGEST_TIMEOUT", 10)
+DEFAULT_INGEST_RETRY = _safe_int("MQTT_INGEST_RETRY", 3)
 
 
 def _on_connect(client, userdata, flags, rc):
@@ -56,8 +72,12 @@ def _post_with_retry(
 
     body = {"readings": [payload]}
     raw_json = json.dumps(body).encode("utf-8")
-    compressed = gzip.compress(raw_json)
-    headers["Content-Encoding"] = "gzip"
+    if len(raw_json) > 1024:
+        compressed = gzip.compress(raw_json)
+        headers["Content-Encoding"] = "gzip"
+        data = compressed
+    else:
+        data = raw_json
     headers["Content-Type"] = "application/json"
     headers["X-Idempotency-Key"] = str(uuid.uuid4())
 
@@ -65,7 +85,7 @@ def _post_with_retry(
         try:
             resp = session.post(
                 api_url,
-                data=compressed,
+                data=data,
                 headers=headers,
                 timeout=ingest_timeout,
             )
@@ -85,7 +105,7 @@ def _post_with_retry(
                 except Exception:
                     print("[MQTT Sub] Forwarded -> API OK (non-JSON response)")
                     return True
-            elif resp.status_code in (429, 500, 502, 503, 504):
+            elif resp.status_code in (408, 429, 500, 502, 503, 504):
                 if attempt < max_retries:
                     wait = min(2 ** attempt, 8)
                     print(f"[MQTT Sub] API error {resp.status_code}, retrying in {wait}s...")
@@ -145,6 +165,20 @@ def _start_worker(
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
+
+    def watcher():
+        """Watch the worker thread and respawn it if it dies."""
+        nonlocal t
+        while not stop_event.is_set():
+            t.join(timeout=1.0)
+            if not stop_event.is_set() and not t.is_alive():
+                print("[MQTT Sub] Worker thread died, respawning...")
+                t = threading.Thread(target=worker, daemon=True)
+                t.start()
+            time.sleep(1.0)
+
+    watcher_thread = threading.Thread(target=watcher, daemon=True)
+    watcher_thread.start()
     return q, stop_event, t
 
 
@@ -169,7 +203,7 @@ def _on_message_factory(q: queue.Queue):
     return _on_message
 
 
-def _drain_and_shutdown(q: queue.Queue, worker_thread: threading.Thread, client, timeout: float = 5.0):
+def _drain_and_shutdown(q: queue.Queue, worker_thread: threading.Thread, client, timeout: float = 30.0):
     """Gracefully drain the queue and shut down the worker thread."""
     print(f"[MQTT Sub] Draining queue ({q.qsize()} items remaining)...")
     drain_start = time.monotonic()
@@ -232,7 +266,8 @@ def start_subscriber(
     )
 
     client = mqtt.Client(
-        client_id=client_id or "enviroswarm-sub-001"
+        client_id=client_id or "enviroswarm-sub-001",
+        clean_session=False,
     )
     client.on_connect = _on_connect
     client.on_message = _on_message_factory(q)
@@ -242,7 +277,7 @@ def start_subscriber(
     def _signal_handler(signum, frame):
         print(f"[MQTT Sub] Received signal {signum}, shutting down gracefully...")
         stop_event.set()
-        _drain_and_shutdown(q, worker_thread, client, timeout=5.0)
+        _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _signal_handler)
@@ -267,7 +302,7 @@ def start_subscriber(
     if run_duration_seconds:
         time.sleep(run_duration_seconds)
         stop_event.set()
-        _drain_and_shutdown(q, worker_thread, client, timeout=5.0)
+        _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
         print("[MQTT Sub] Stopped.")
     else:
         # Keep running until interrupted
@@ -277,7 +312,7 @@ def start_subscriber(
         except KeyboardInterrupt:
             print("[MQTT Sub] Stopped by user, shutting down gracefully...")
             stop_event.set()
-            _drain_and_shutdown(q, worker_thread, client, timeout=5.0)
+            _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
 
 
 def main():
@@ -290,7 +325,7 @@ def main():
     parser.add_argument(
         "--broker-port",
         type=int,
-        default=int(os.getenv("MQTT_BROKER_PORT", "1883")),
+        default=_safe_int("MQTT_BROKER_PORT", 1883),
         help="MQTT broker port (default: 1883 or MQTT_BROKER_PORT env var)",
     )
     parser.add_argument(

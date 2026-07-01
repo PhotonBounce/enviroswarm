@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { apiClient } from '../api/client';
 import { SensorStation, ApiResponse, SensorReading, SensorType, SENSOR_UNITS } from '../types';
@@ -74,7 +75,7 @@ export default function SubmitReadingScreen() {
 
   if (!selectedStation) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <Text style={styles.title}>Select a Station</Text>
         <FlatList
           data={stations}
@@ -93,12 +94,12 @@ export default function SubmitReadingScreen() {
             <Text style={styles.emptyText}>No stations. Create one from the Stations tab.</Text>
           }
         />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedStation(null)}>
         <Text style={styles.backBtnText}>← Back to stations</Text>
       </TouchableOpacity>
@@ -111,7 +112,7 @@ export default function SubmitReadingScreen() {
         onSubmit={handleSubmit}
         loading={loading}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 

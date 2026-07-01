@@ -1,6 +1,6 @@
 """Auth router: register, login, refresh, me."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -28,6 +28,24 @@ from app.schemas import (
 from app.dependencies import check_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+# Cookie settings for web clients
+COOKIE_SETTINGS = {
+    "key": "access_token",
+    "httponly": True,
+    "secure": False,  # Set to True in production (HTTPS only)
+    "samesite": "lax",
+    "max_age": 3600,  # 1 hour
+}
+
+REFRESH_COOKIE_SETTINGS = {
+    "key": "refresh_token",
+    "httponly": True,
+    "secure": False,
+    "samesite": "lax",
+    "max_age": 604800,  # 7 days
+}
 
 
 @router.post("/register", response_model=StandardResponse)
@@ -71,7 +89,9 @@ async def register(
 
 @router.post("/login", response_model=StandardResponse)
 async def login(
-    body: UserLoginRequest, db: AsyncSession = Depends(get_db)
+    body: UserLoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Basic brute-force protection: limit login attempts per email
     login_key = f"login:{body.email}"
@@ -96,6 +116,11 @@ async def login(
 
     access_token = create_access_token(str(user.id))
     refresh_token = create_refresh_token(str(user.id))
+
+    # Set httpOnly cookies for web clients
+    response.set_cookie(value=access_token, **COOKIE_SETTINGS)
+    response.set_cookie(value=refresh_token, **REFRESH_COOKIE_SETTINGS)
+
     return StandardResponse(
         data=TokenResponse(
             access_token=access_token,
@@ -106,7 +131,9 @@ async def login(
 
 @router.post("/refresh", response_model=StandardResponse)
 async def refresh_token(
-    body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)
+    body: RefreshTokenRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     payload = decode_refresh_token(body.refresh_token)
     user_id = payload.get("sub")
@@ -149,12 +176,27 @@ async def refresh_token(
     if old_jti:
         revoke_refresh_token(old_jti)
 
+    # Update cookies
+    response.set_cookie(value=new_access, **COOKIE_SETTINGS)
+    response.set_cookie(value=new_refresh, **REFRESH_COOKIE_SETTINGS)
+
     return StandardResponse(
         data=TokenResponse(
             access_token=new_access,
             refresh_token=new_refresh,
         ).model_dump(mode="json")
     )
+
+
+@router.post("/logout", response_model=StandardResponse)
+async def logout(
+    response: Response,
+    user: User = Depends(get_current_user),
+) -> StandardResponse:
+    """Clear auth cookies and log out the user."""
+    response.delete_cookie(COOKIE_SETTINGS["key"])
+    response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
+    return StandardResponse(data={"logged_out": True})
 
 
 @router.get("/me", response_model=StandardResponse)

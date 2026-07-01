@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.dependencies import require_tier, require_permission, rate_limit_dependency
 from app.models import ApiKey, User
@@ -39,11 +38,12 @@ async def create_api_key(
     await db.execute(select(User).where(User.id == user.id).with_for_update())
 
     # Check tier limit
+    from app.constants import API_KEY_TIER_LIMITS
     result = await db.execute(
         select(ApiKey).where(ApiKey.user_id == user.id, ApiKey.deleted_at.is_(None))
     )
     existing = result.scalars().all()
-    tier_limits = {"pro": 1, "enterprise": 10, "free": 0}
+    tier_limits = API_KEY_TIER_LIMITS
     if len(existing) >= tier_limits.get(user.tier, 0):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

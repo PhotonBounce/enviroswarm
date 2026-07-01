@@ -21,12 +21,14 @@ export default function ApiKeys() {
   const [keyName, setKeyName] = useState('')
   const [newKey, setNewKey] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const canManageKeys = tier === 'pro' || tier === 'enterprise'
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!keyName.trim()) return
+    setToast(null)
     try {
       const result = await createApiKey.mutateAsync(keyName.trim())
       // result.raw_key contains the one-time raw API key from the backend.
@@ -40,21 +42,23 @@ export default function ApiKeys() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to revoke this API key?')) return
+    setToast(null)
     try {
       await deleteApiKey.mutateAsync(id)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to revoke API key'
-      alert(message)
+      setToast({ type: 'error', message })
     }
   }
 
   const handleCopy = async (key: string, id: string) => {
+    setToast(null)
     try {
       await navigator.clipboard.writeText(key)
       setCopiedId(id)
       setTimeout(() => setCopiedId(null), 2000)
     } catch {
-      alert('Clipboard access denied. Please copy manually.')
+      setToast({ type: 'error', message: 'Clipboard access denied. Please copy manually.' })
     }
   }
 
@@ -83,6 +87,11 @@ export default function ApiKeys() {
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
+          {toast.message}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">API Keys</h1>

@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.dependencies import require_permission, rate_limit_dependency
 from app.models import Subscription, User
@@ -16,32 +15,34 @@ from app.schemas import StandardResponse, PricingTier, SubscriptionRequest, Subs
 router = APIRouter(prefix="", tags=["billing"])
 
 
+from app.constants import RETENTION_DAYS, STATION_TIER_LIMITS, READING_TIER_LIMITS, API_KEY_TIER_LIMITS
+
 PRICING_TIERS = [
     PricingTier(
         name="free",
         price_monthly=0.0,
-        stations=1,
-        readings_per_day=100,
-        retention_days=7,
-        api_keys=0,
+        stations=STATION_TIER_LIMITS["free"],
+        readings_per_day=READING_TIER_LIMITS["free"],
+        retention_days=RETENTION_DAYS["free"],
+        api_keys=API_KEY_TIER_LIMITS["free"],
         description="Free tier for individual contributors",
     ),
     PricingTier(
         name="pro",
         price_monthly=29.0,
-        stations=10,
-        readings_per_day=10000,
-        retention_days=90,
-        api_keys=1,
+        stations=STATION_TIER_LIMITS["pro"],
+        readings_per_day=READING_TIER_LIMITS["pro"],
+        retention_days=RETENTION_DAYS["pro"],
+        api_keys=API_KEY_TIER_LIMITS["pro"],
         description="Pro tier for small teams and researchers",
     ),
     PricingTier(
         name="enterprise",
         price_monthly=299.0,
-        stations=9999,
-        readings_per_day=99999999,
-        retention_days=730,
-        api_keys=10,
+        stations=STATION_TIER_LIMITS["enterprise"],
+        readings_per_day=READING_TIER_LIMITS["enterprise"],
+        retention_days=RETENTION_DAYS["enterprise"],
+        api_keys=API_KEY_TIER_LIMITS["enterprise"],
         description="Enterprise tier with SLA support",
     ),
 ]

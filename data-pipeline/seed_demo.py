@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import gzip
+import hashlib
 import json
 import os
 import random
@@ -254,7 +255,7 @@ def _ingest_with_payload(
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "X-Idempotency-Key": str(uuid.uuid4()),
+        "X-Idempotency-Key": hashlib.sha256(json.dumps(payload).encode("utf-8")).hexdigest(),
     }
     raw_json = json.dumps(payload).encode("utf-8")
     compressed = gzip.compress(raw_json)
@@ -316,12 +317,17 @@ def run_seed(
     dry_run: bool = False,
     api_base: Optional[str] = None,
     cleanup: bool = False,
+    append: bool = False,
     stations: int = TOTAL_STATIONS,
     days: int = DAYS_OF_HISTORY,
     batch_size: int = BATCH_SIZE,
     batch_delay: float = BATCH_DELAY_SECONDS,
     ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
     wait_for_backend: bool = False,
+    email: str = DEMO_EMAIL,
+    password: str = DEMO_PASSWORD,
+    tier: str = DEMO_TIER,
+    duration_months: int = 1,
 ) -> Dict[str, Any]:
     """Execute the full demo seeding pipeline.
 
@@ -359,7 +365,7 @@ def run_seed(
             while time.monotonic() < deadline:
                 try:
                     probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
-                    if probe.status_code < 500:
+                    if 200 <= probe.status_code < 300:
                         print("  Backend is up.")
                         break
                 except Exception:
@@ -368,25 +374,84 @@ def run_seed(
             else:
                 print("  WARNING: Backend did not respond within 60s, continuing anyway...")
 
-        print(f"\n[1/6] Registering demo user ({DEMO_EMAIL})...")
+        print(f"\n[1/6] Registering demo user ({email})...")
         try:
-            register_user(session, DEMO_EMAIL, DEMO_PASSWORD, effective_api_base)
+            register_user(session, email, password, effective_api_base)
         except Exception as e:
             print(f"  Registration note: {e}")
 
         print("[2/6] Logging in...")
         try:
-            token = login_user(session, DEMO_EMAIL, DEMO_PASSWORD, effective_api_base)
+            token = login_user(session, email, password, effective_api_base)
             print("  Authenticated successfully.")
         except Exception as e:
             print(f"  FATAL: Could not login: {e}")
             summary["api_errors"] += 1
             return summary
 
-        print(f"[3/6] Upgrading tier to {DEMO_TIER}...")
+        print(f"[3/6] Upgrading tier to {tier}...")
         try:
-            subscribe_user(session, token, DEMO_TIER, effective_api_base, duration_months=1)
-            print(f"  Tier upgraded to {DEMO_TIER}.")
+            subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
+            print(f"  Tier upgraded to {tier}.")
+        except Exception as e:
+            print(f"  Tier upgrade note: {e}")
+            # Fall back to querying current tier and pricing so we can adapt station count
+            try:
+                me = get_user_me(session, token, effective_api_base)
+                actual_tier = me.get("tier", "free")
+                pricing = get_pricing(session, effective_api_base)
+                max_stations = _station_limit_from_pricing(pricing, actual_tier)
+                if stations > max_stations:
+                    print(f"  WARNING: Tier is '{actual_tier}', limiting stations to {max_stations}.")
+                    stations = max_stations
+            except Exception as me_err:
+                print(f"  Could not determine tier: {me_err}")
+                stations = 1
+
+    created_stations: List[Dict[str, Any]] = []
+    created_station_ids: List[str] = []
+
+    if not dry_run:
+        print("=" * 60)
+        print("ENViroSwarm Demo Data Seeder")
+        print("=" * 60)
+
+        session = _make_session()
+
+        if wait_for_backend:
+            print("\n[0/6] Waiting for backend to become available...")
+            deadline = time.monotonic() + 60.0
+            while time.monotonic() < deadline:
+                try:
+                    probe = session.get(_api_url(effective_api_base, "/api/v1/pricing"), timeout=5)
+                    if 200 <= probe.status_code < 300:
+                        print("  Backend is up.")
+                        break
+                except Exception:
+                    pass
+                time.sleep(1.0)
+            else:
+                print("  WARNING: Backend did not respond within 60s, continuing anyway...")
+
+        print(f"\n[1/6] Registering demo user ({email})...")
+        try:
+            register_user(session, email, password, effective_api_base)
+        except Exception as e:
+            print(f"  Registration note: {e}")
+
+        print("[2/6] Logging in...")
+        try:
+            token = login_user(session, email, password, effective_api_base)
+            print("  Authenticated successfully.")
+        except Exception as e:
+            print(f"  FATAL: Could not login: {e}")
+            summary["api_errors"] += 1
+            return summary
+
+        print(f"[3/6] Upgrading tier to {tier}...")
+        try:
+            subscribe_user(session, token, tier, effective_api_base, duration_months=duration_months)
+            print(f"  Tier upgraded to {tier}.")
         except Exception as e:
             print(f"  Tier upgrade note: {e}")
             # Fall back to querying current tier and pricing so we can adapt station count
@@ -403,48 +468,22 @@ def run_seed(
                 stations = 1
 
         # ------------------------------------------------------------------
-        # 1b. Cleanup / idempotency
+        # 1b. Append mode — use existing stations
         # ------------------------------------------------------------------
-        if cleanup:
-            print("[4/6] Cleaning up existing demo stations...")
+        if append:
+            print("[4/6] Append mode: fetching existing stations...")
             try:
                 existing = list_stations(session, token, effective_api_base)
-                for s in existing:
-                    sid = s.get("id")
-                    if sid:
-                        try:
-                            delete_station(session, token, sid, effective_api_base)
-                            print(f"  Deleted station {sid}")
-                        except Exception as del_err:
-                            print(f"  Could not delete {sid}: {del_err}")
-            except Exception as e:
-                print(f"  Cleanup note: {e}")
-        else:
-            # Check for existing stations to avoid duplicates
-            try:
-                existing = list_stations(session, token, effective_api_base)
-                if existing:
-                    print(f"  Found {len(existing)} existing station(s). Skipping creation to avoid duplicates.")
-                    print("  Use --cleanup to remove them first.")
-                    # We can still generate readings for existing stations if desired,
-                    # but for idempotency we will just stop here.
-                    summary["stations_created"] = len(existing)
-                    summary["readings_generated"] = 0
-                    summary["elapsed_seconds"] = round(time.time() - start_time, 2)
-                    print("\n" + "=" * 60)
-                    print("SUMMARY")
-                    print("=" * 60)
-                    print(f"  Mode:          LIVE")
-                    print(f"  API Base:      {effective_api_base}")
-                    print(f"  Stations:      {summary['stations_created']}")
-                    print(f"  Readings:      0")
-                    print(f"  Batches sent:  0")
-                    print(f"  API errors:    {summary['api_errors']}")
-                    print(f"  Elapsed:       {summary['elapsed_seconds']:.2f}s")
-                    print("=" * 60)
+                if not existing:
+                    print("  No existing stations found. Nothing to append to.")
                     return summary
+                created_stations = existing
+                summary["stations_created"] = len(existing)
+                print(f"  Found {len(existing)} existing station(s).")
             except Exception as e:
-                print(f"  Existing station check note: {e}")
+                print(f"  Could not fetch existing stations: {e}")
+                summary["api_errors"] += 1
+                return summary
     else:
         print("=" * 60)
         print("ENViroSwarm Demo Data Seeder  —  DRY RUN")
@@ -455,32 +494,33 @@ def run_seed(
     # ------------------------------------------------------------------
     # 2. Create Stations
     # ------------------------------------------------------------------
-    print(f"\n[5/6] Creating {stations} simulated stations...")
-    local_stations = create_stations(total=stations)
-    created_stations: List[Dict[str, Any]] = []
+    if not append:
+        print(f"\n[5/6] Creating {stations} simulated stations...")
+        local_stations = create_stations(total=stations)
 
-    for idx, station in enumerate(local_stations, 1):
-        if dry_run:
-            print(f"  [{idx}/{stations}] {station['name']}  lat={station['latitude']} lon={station['longitude']} sensors={station['sensor_types']}")
-            created_stations.append(station)
-        else:
-            try:
-                api_station = create_station_api(session, token, station, effective_api_base)
-                # Merge API response (which may contain real DB id) with our local data
-                merged = {
-                    **station,
-                    "latitude": api_station.get("latitude"),
-                    "longitude": api_station.get("longitude"),
-                    "id": api_station.get("id", station["id"]),
-                }
-                created_stations.append(merged)
-                print(f"  [{idx}/{stations}] Created: {merged['name']} (id={merged['id']})")
-                summary["stations_created"] += 1
-            except Exception as e:
-                print(f"  [{idx}/{stations}] ERROR creating {station['name']}: {e}")
-                summary["api_errors"] += 1
-                # Do NOT add locally-fallback stations to created_stations
-                # so we avoid sending readings for non-existent stations.
+        for idx, station in enumerate(local_stations, 1):
+            if dry_run:
+                print(f"  [{idx}/{stations}] {station['name']}  lat={station['latitude']} lon={station['longitude']} sensors={station['sensor_types']}")
+                created_stations.append(station)
+            else:
+                try:
+                    api_station = create_station_api(session, token, station, effective_api_base)
+                    # Merge API response (which may contain real DB id) with our local data
+                    merged = {
+                        **station,
+                        "latitude": api_station.get("latitude", station["latitude"]),
+                        "longitude": api_station.get("longitude", station["longitude"]),
+                        "id": api_station.get("id", station["id"]),
+                    }
+                    created_stations.append(merged)
+                    created_station_ids.append(merged["id"])
+                    print(f"  [{idx}/{stations}] Created: {merged['name']} (id={merged['id']})")
+                    summary["stations_created"] += 1
+                except Exception as e:
+                    print(f"  [{idx}/{stations}] ERROR creating {station['name']}: {e}")
+                    summary["api_errors"] += 1
+                    # Do NOT add locally-fallback stations to created_stations
+                    # so we avoid sending readings for non-existent stations.
 
     # ------------------------------------------------------------------
     # 3. Generate Readings
@@ -514,9 +554,9 @@ def run_seed(
             try:
                 result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
                 summary["batches_sent"] += 1
-                inserted = result.get("inserted", "?") if isinstance(result, dict) else "?"
+                inserted = result.get("inserted", "?")
                 print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
-            except Exception as e:
+            except requests.RequestException as e:
                 summary["api_errors"] += 1
                 sample = json.dumps({"readings": batch[:2]})[:500]
                 print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
@@ -563,6 +603,19 @@ def run_seed(
         print(f"    {st:<15} {sensor_counts[st]:>8,}")
 
     print("=" * 60)
+
+    # ------------------------------------------------------------------
+    # 6. Cleanup (only stations created in this run)
+    # ------------------------------------------------------------------
+    if cleanup and not dry_run and created_station_ids:
+        print(f"\n[8/8] Cleaning up {len(created_station_ids)} demo station(s)...")
+        for sid in created_station_ids:
+            try:
+                delete_station(session, token, sid, effective_api_base)
+                print(f"  Deleted station {sid}")
+            except Exception as del_err:
+                print(f"  Could not delete {sid}: {del_err}")
+
     return summary
 
 
@@ -598,7 +651,7 @@ def main():
     parser.add_argument(
         "--cleanup",
         action="store_true",
-        help="Delete existing demo stations before seeding.",
+        help="Delete demo stations created during this run after seeding.",
     )
     parser.add_argument(
         "--batch-size",
@@ -623,18 +676,52 @@ def main():
         action="store_true",
         help="Poll backend until it responds before starting.",
     )
+    parser.add_argument(
+        "--email",
+        type=str,
+        default=DEMO_EMAIL,
+        help=f"Demo user email (default: {DEMO_EMAIL})",
+    )
+    parser.add_argument(
+        "--password",
+        type=str,
+        default=DEMO_PASSWORD,
+        help=f"Demo user password (default: {DEMO_PASSWORD})",
+    )
+    parser.add_argument(
+        "--tier",
+        type=str,
+        default=DEMO_TIER,
+        help=f"Demo subscription tier (default: {DEMO_TIER})",
+    )
+    parser.add_argument(
+        "--duration-months",
+        type=int,
+        default=1,
+        help="Subscription duration in months (default: 1)",
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Skip station creation and append readings to existing stations.",
+    )
     args = parser.parse_args()
 
     summary = run_seed(
         dry_run=args.dry_run,
         api_base=args.api_base,
         cleanup=args.cleanup,
+        append=args.append,
         stations=args.stations,
         days=args.days,
         batch_size=args.batch_size,
         batch_delay=args.batch_delay,
         ingest_timeout=args.ingest_timeout,
         wait_for_backend=args.wait_for_backend,
+        email=args.email,
+        password=args.password,
+        tier=args.tier,
+        duration_months=args.duration_months,
     )
 
     if summary.get("api_errors", 0) > 0:

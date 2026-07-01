@@ -3,12 +3,9 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.main import app
 from app.database import get_engine, Base
-from app.models import User
-from app.auth import hash_password
 
 
 @pytest_asyncio.fixture(scope="module")
@@ -66,3 +63,75 @@ async def test_me_endpoint(client: AsyncClient):
     assert r.status_code == 200
     data = r.json()
     assert data["data"]["email"] == "me@example.com"
+
+
+@pytest.mark.asyncio
+async def test_refresh_token(client: AsyncClient):
+    # Register
+    await client.post("/api/v1/auth/register", json={
+        "email": "refresh@example.com",
+        "password": "Password123"
+    })
+    # Login
+    r = await client.post("/api/v1/auth/login", json={
+        "email": "refresh@example.com",
+        "password": "Password123"
+    })
+    refresh_token = r.json()["data"]["refresh_token"]
+
+    # Refresh
+    r = await client.post("/api/v1/auth/refresh", json={
+        "refresh_token": refresh_token
+    })
+    assert r.status_code == 200
+    data = r.json()
+    assert data["success"] is True
+    assert "access_token" in data["data"]
+    assert data["data"]["access_token"] != refresh_token
+
+
+@pytest.mark.asyncio
+async def test_register_duplicate_email(client: AsyncClient):
+    await client.post("/api/v1/auth/register", json={
+        "email": "dup@example.com",
+        "password": "Password123"
+    })
+    r = await client.post("/api/v1/auth/register", json={
+        "email": "dup@example.com",
+        "password": "Password123"
+    })
+    assert r.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_register_weak_password(client: AsyncClient):
+    r = await client.post("/api/v1/auth/register", json={
+        "email": "weak@example.com",
+        "password": "pass"
+    })
+    assert r.status_code in (400, 422)
+
+
+@pytest.mark.asyncio
+async def test_login_wrong_password(client: AsyncClient):
+    await client.post("/api/v1/auth/register", json={
+        "email": "wrongpass@example.com",
+        "password": "Password123"
+    })
+    r = await client.post("/api/v1/auth/login", json={
+        "email": "wrongpass@example.com",
+        "password": "WrongPassword123"
+    })
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_me_missing_token(client: AsyncClient):
+    r = await client.get("/api/v1/auth/me")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_me_malformed_token(client: AsyncClient):
+    r = await client.get("/api/v1/auth/me", headers={"Authorization": "Bearer badtoken"})
+    assert r.status_code == 401

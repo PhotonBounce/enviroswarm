@@ -99,6 +99,7 @@ def _pm10_value(pm25: float) -> float:
     ratio = random.uniform(1.2, 2.5)
     noise = random.gauss(0, 10)
     value = pm25 * ratio + noise
+    value = max(pm25, value)
     return round(max(0.0, min(200.0, value)), 2)
 
 
@@ -175,7 +176,7 @@ def generate_readings_for_station(
         List of reading dicts ready for ingest.
     """
     if end_time is None:
-        end_time = datetime.now(timezone.utc)
+        end_time = datetime.now(timezone.utc).replace(microsecond=0)
     
     start_time = end_time - timedelta(days=days)
     sensor_types = station.get("sensor_types", [])

@@ -78,7 +78,7 @@ def create_station(
 
 def create_stations(
     total: int = 30,
-    per_city: int = None,
+    per_city: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """Create a fleet of simulated stations distributed across cities.
     

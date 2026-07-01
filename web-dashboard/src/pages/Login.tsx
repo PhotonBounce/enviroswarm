@@ -18,14 +18,13 @@ export default function Login() {
     e.preventDefault()
     setError('')
     try {
-      const result = await loginMutation.mutateAsync({ email, password })
-      // Store token in sessionStorage so the axios interceptor can use it for /me
-      sessionStorage.setItem('enviroswarm_token', result.access_token)
-      // Fetch user after login using the configured axios client
+      await loginMutation.mutateAsync({ email: email.trim(), password })
+      // Cookie is set by backend (httpOnly). Browser sends it automatically.
+      // Fetch user profile.
       try {
         const userData = await api.get('/me')
         if (userData.data?.success) {
-          login(result.access_token, userData.data.data)
+          login(userData.data.data)
         } else {
           setError(userData.data?.error || 'Failed to load user')
         }

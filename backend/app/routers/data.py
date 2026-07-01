@@ -1,15 +1,14 @@
 """Data query router."""
 
-import math
 from datetime import datetime, timedelta, timezone
+import math
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
 from app.database import get_db
 from app.dependencies import rate_limit_dependency, require_permission
 from app.models import SensorReading, SensorStation, User
@@ -17,7 +16,6 @@ from app.schemas import (
     StandardResponse,
     DataQueryResponse,
     NearbyStationResponse,
-    SENSOR_TYPES,
 )
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -37,7 +35,8 @@ async def query_data(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Retention check based on tier
-    retention_days = {"free": 7, "pro": 90, "enterprise": 730}
+    from app.constants import RETENTION_DAYS
+    retention_days = RETENTION_DAYS
     max_retention = retention_days.get(user.tier, 7)
     earliest_allowed = datetime.now(timezone.utc) - timedelta(days=max_retention)
     if start:
@@ -46,6 +45,13 @@ async def query_data(
         effective_start = max(start, earliest_allowed)
     else:
         effective_start = earliest_allowed
+
+    if end:
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start cannot be after end")
 
     if aggregate and aggregate != "none":
         # Aggregation query using date_trunc
@@ -173,16 +179,14 @@ async def nearby(
         )
     )
     if sensor_type:
-        # JSON contains check removed; Python-side filter below handles this.
-        pass
+        # JSON contains check; sensor_types stored as JSON list
+        stmt = stmt.where(SensorStation.sensor_types.contains([sensor_type]))
 
     result = await db.execute(stmt)
     stations = result.scalars().all()
 
     nearby_stations = []
     for s in stations:
-        if s.latitude is None or s.longitude is None:
-            continue
         if sensor_type and sensor_type not in s.sensor_types:
             continue
 
@@ -191,8 +195,8 @@ async def nearby(
             item = NearbyStationResponse(
                 id=s.id,
                 name=s.name,
-                latitude=float(s.latitude) if s.latitude else None,
-                longitude=float(s.longitude) if s.longitude else None,
+                latitude=float(s.latitude),
+                longitude=float(s.longitude),
                 sensor_types=s.sensor_types,
                 distance_km=round(d, 2),
             )

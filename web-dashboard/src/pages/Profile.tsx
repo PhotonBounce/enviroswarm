@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Mail, Shield, CreditCard } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
@@ -17,6 +17,7 @@ export default function Profile() {
   const [saveError, setSaveError] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const updateUser = useUpdateUser()
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Sync local email state when user data loads or changes
   useEffect(() => {
@@ -24,6 +25,13 @@ export default function Profile() {
       setEmail(user.email)
     }
   }, [user?.email])
+
+  // Clear any pending saveSuccess timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+    }
+  }, [])
 
   const tierColors = {
     free: 'secondary' as const,
@@ -38,7 +46,8 @@ export default function Profile() {
       await updateUser.mutateAsync({ email })
       setSaveSuccess(true)
       setIsEditing(false)
-      setTimeout(() => setSaveSuccess(false), 3000)
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
+      saveTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 3000)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to update profile'
       setSaveError(message)

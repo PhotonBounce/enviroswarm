@@ -19,7 +19,7 @@ def _on_connect(client, userdata, flags, rc):
 
 
 def _on_publish(client, userdata, mid):
-    pass
+    print(f"[MQTT] Published message, mid={mid}")
 
 
 def publish_readings(
@@ -97,7 +97,7 @@ def publish_readings(
         if delay_seconds:
             time.sleep(delay_seconds)
     
-    client.loop_stop()
     client.disconnect()
+    client.loop_stop()
     print(f"[MQTT] Published {published} messages.")
     return published

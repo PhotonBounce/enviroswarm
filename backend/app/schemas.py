@@ -90,7 +90,14 @@ class StationUpdateRequest(BaseModel):
         invalid = [t for t in v if t not in SENSOR_TYPES]
         if invalid:
             raise ValueError(f"Invalid sensor types: {invalid}. Must be one of: {SENSOR_TYPES}")
-        return v
+        # Deduplicate while preserving order
+        seen = set()
+        deduped = []
+        for t in v:
+            if t not in seen:
+                seen.add(t)
+                deduped.append(t)
+        return deduped
 
     @field_validator("status", mode="before")
     @classmethod
@@ -115,13 +122,30 @@ class StationCreateRequest(BaseModel):
         invalid = [t for t in v if t not in SENSOR_TYPES]
         if invalid:
             raise ValueError(f"Invalid sensor types: {invalid}. Must be one of: {SENSOR_TYPES}")
-        return v
+        # Deduplicate while preserving order
+        seen = set()
+        deduped = []
+        for t in v:
+            if t not in seen:
+                seen.add(t)
+                deduped.append(t)
+        return deduped
 
     @field_validator("status", mode="before")
     @classmethod
     def validate_status(cls, v: str) -> str:
         if v not in {"active", "inactive", "maintenance"}:
             raise ValueError(f"Invalid status: {v}. Must be one of: active, inactive, maintenance")
+        return v
+
+    @field_validator("longitude", mode="after")
+    @classmethod
+    def validate_latitude_longitude(cls, v: Optional[float], info) -> Optional[float]:
+        data = info.data
+        lat = data.get("latitude")
+        lon = v
+        if (lat is not None) != (lon is not None):
+            raise ValueError("latitude and longitude must both be set or both be omitted")
         return v
 
 class StationResponse(BaseModel):
@@ -163,6 +187,21 @@ class SensorReadingPayload(BaseModel):
             return v
         if v.tzinfo is None:
             return v.replace(tzinfo=timezone.utc)
+        return v
+
+    @field_validator("value", mode="after")
+    @classmethod
+    def validate_value_bounds(cls, v: float) -> float:
+        if abs(v) >= 1e9:
+            raise ValueError("value must be between -1e9 and 1e9")
+        return v
+
+    @field_validator("unit", mode="before")
+    @classmethod
+    def validate_unit(cls, v: str) -> str:
+        from app.constants import ACCEPTED_UNITS
+        if v not in ACCEPTED_UNITS:
+            raise ValueError(f"Invalid unit: {v}. Must be one of: {sorted(ACCEPTED_UNITS)}")
         return v
 
 class IngestRequest(BaseModel):

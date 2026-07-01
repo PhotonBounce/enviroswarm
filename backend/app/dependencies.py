@@ -1,6 +1,7 @@
 """Rate limiting, tier checking, and API key auth dependencies."""
 
 import asyncio
+import hmac
 import time
 import uuid
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from app.database import get_db, get_sessionmaker
 from app.models import ApiKey, User
 from app.auth import decode_access_token
 from app.utils.crypto import hash_key, extract_prefix
+from app.constants import RATE_LIMITS
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -25,12 +27,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 _rate_limit_store: dict = {}
 _rate_limit_lock = asyncio.Lock()
-
-RATE_LIMITS = {
-    "free": 10,
-    "pro": 100,
-    "enterprise": 1000,
-}
 
 _MAX_RATE_LIMIT_ENTRIES = 100_000
 
@@ -102,6 +98,10 @@ async def get_current_user_or_api_key(
     """Authenticate via API key (x-api-key header or Bearer token that looks like an API key)
     or fall back to JWT bearer token.
     """
+    cached = getattr(request.state, "_cached_user", None)
+    if cached is not None:
+        return cached
+
     api_key_val = extract_api_key(request, x_api_key)
     if api_key_val:
         prefix = extract_prefix(api_key_val)
@@ -115,7 +115,7 @@ async def get_current_user_or_api_key(
         )
         keys = result.scalars().all()
         for api_key in keys:
-            if api_key.key_hash == key_hash:
+            if hmac.compare_digest(api_key.key_hash, key_hash):
                 if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED, detail="API key expired"
@@ -142,6 +142,7 @@ async def get_current_user_or_api_key(
                     )
                 # Attach rate limit info for dependency use later
                 request.state.api_key = api_key
+                request.state._cached_user = user
                 return user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
@@ -178,6 +179,7 @@ async def get_current_user_or_api_key(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive"
         )
+    request.state._cached_user = user
     return user
 
 

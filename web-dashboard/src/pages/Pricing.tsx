@@ -127,7 +127,7 @@ export default function Pricing() {
                 Contact us for data licensing, bulk exports, and custom SLA agreements.
               </p>
             </div>
-            <Button variant="outline">Contact Sales</Button>
+            <Button variant="outline" onClick={() => window.location.href = 'mailto:sales@enviroswarm.example.com?subject=Enterprise%20Inquiry'}>Contact Sales</Button>
           </div>
         </CardContent>
       </Card>

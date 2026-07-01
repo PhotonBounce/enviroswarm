@@ -20,7 +20,7 @@ export default function Dashboard() {
   const { data: todayResponse, isLoading: readingsLoading } = useSensorData({
     start: today,
     end: now,
-    limit: 1,
+    limit: 10,
   })
 
   const stats = useMemo(() => {
@@ -35,6 +35,14 @@ export default function Dashboard() {
   }, [stations, todayResponse])
 
   const recentActivity = useMemo(() => {
+    if (todayResponse?.readings && todayResponse.readings.length > 0) {
+      const sorted = [...todayResponse.readings].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 4)
+      return sorted.map((reading) => ({
+        title: `${capitalize(reading.sensor_type)}: ${typeof reading.value === 'number' ? reading.value.toFixed(2) : reading.value} ${reading.unit}`,
+        time: formatDate(reading.timestamp),
+        type: 'reading' as const,
+      }))
+    }
     if (!stations || stations.length === 0) return []
     const sorted = [...stations].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 4)
     return sorted.map((station) => ({
@@ -42,7 +50,7 @@ export default function Dashboard() {
       time: formatDate(station.created_at),
       type: 'station' as const,
     }))
-  }, [stations])
+  }, [todayResponse, stations])
 
   return (
     <div className="space-y-6">
