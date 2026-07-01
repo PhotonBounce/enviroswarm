@@ -189,7 +189,12 @@ async def test_ingest_api_key_without_write_permission():
             "tier": "pro",
             "duration_months": 1
         })
-        assert sub_r.status_code == 200
+        assert sub_r.status_code == 402
+        # Mock payment as completed
+        from sqlalchemy import text
+        async with get_engine().begin() as conn:
+            await conn.execute(text("UPDATE subscriptions SET payment_status = 'completed' WHERE user_id = (SELECT id FROM users WHERE email = 'proingest@example.com')"))
+            await conn.execute(text("UPDATE users SET tier = 'pro' WHERE email = 'proingest@example.com'"))
 
         # Create a station
         station_r = await ac.post("/api/v1/stations", json={

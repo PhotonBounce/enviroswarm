@@ -11,6 +11,7 @@ import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -193,7 +194,7 @@ async def _get_user_from_token(token: str, db: AsyncSession) -> User:
 
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
-    request: Optional[Request] = None,
+    request: Request = None,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Authenticate user from JWT in Authorization header OR httpOnly cookie."""

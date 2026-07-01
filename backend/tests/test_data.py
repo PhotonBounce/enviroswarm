@@ -136,7 +136,12 @@ async def test_query_data_with_api_key(data_client: AsyncClient):
         "tier": "pro",
         "duration_months": 1
     })
-    assert sub_r.status_code == 200
+    assert sub_r.status_code == 402
+    # Mock payment as completed
+    from sqlalchemy import text
+    async with get_engine().begin() as conn:
+        await conn.execute(text("UPDATE subscriptions SET payment_status = 'completed' WHERE user_id = (SELECT id FROM users WHERE email = 'data@example.com')"))
+        await conn.execute(text("UPDATE users SET tier = 'pro' WHERE email = 'data@example.com'"))
 
     create_r = await data_client.post("/api/v1/apikeys", json={
         "name": "Read Key",

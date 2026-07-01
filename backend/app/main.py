@@ -115,18 +115,24 @@ async def health() -> dict:
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    return JSONResponse(
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4())[:8])
+    response = JSONResponse(
         status_code=exc.status_code,
         content={"success": False, "data": None, "error": exc.detail},
     )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
+    request_id = getattr(request.state, "request_id", str(uuid.uuid4())[:8])
+    response = JSONResponse(
         status_code=422,
         content={"success": False, "data": None, "error": exc.errors()},
     )
+    response.headers["X-Request-ID"] = request_id
+    return response
 
 
 # Global exception handler — never leak internal details in production

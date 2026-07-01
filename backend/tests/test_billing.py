@@ -48,10 +48,10 @@ async def test_subscribe(auth_client: AsyncClient):
         "tier": "pro",
         "duration_months": 1
     })
-    assert r.status_code == 200
+    assert r.status_code == 402
     data = r.json()
-    assert data["success"] is True
-    assert data["data"]["tier"] == "pro"
+    assert data["success"] is False
+    assert "Payment required" in data["error"]
 
 
 @pytest.mark.asyncio
@@ -60,7 +60,7 @@ async def test_subscribe_duplicate(auth_client: AsyncClient):
         "tier": "pro",
         "duration_months": 1
     })
-    assert r.status_code == 200
+    assert r.status_code == 402
 
     # Second subscription should conflict
     r = await auth_client.post("/api/v1/subscribe", json={

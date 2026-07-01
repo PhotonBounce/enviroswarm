@@ -50,7 +50,12 @@ async def pro_client():
             "tier": "pro",
             "duration_months": 1
         })
-        assert sub_r.status_code == 200
+        assert sub_r.status_code == 402
+        # Mock payment as completed so tests can use pro features
+        from sqlalchemy import text
+        async with get_engine().begin() as conn:
+            await conn.execute(text("UPDATE subscriptions SET payment_status = 'completed' WHERE user_id = (SELECT id FROM users WHERE email = 'pro@example.com')"))
+            await conn.execute(text("UPDATE users SET tier = 'pro' WHERE email = 'pro@example.com'"))
         yield ac
 
 
