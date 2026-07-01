@@ -23,7 +23,7 @@ export default function Dashboard() {
     return d.toISOString()
   }, [refreshKey])
 
-  const now = useMemo(() => new Date().toISOString(), [])
+  const now = useMemo(() => new Date().toISOString(), [refreshKey])
 
   const { data: todayResponse, isLoading: readingsLoading } = useSensorData({
     start: today,

@@ -126,6 +126,7 @@ export default function Header() {
           </div>
           <Link
             to="/profile"
+            aria-label="Profile"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-white text-sm font-semibold"
           >
             <User className="h-4 w-4" />

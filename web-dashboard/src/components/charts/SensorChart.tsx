@@ -36,6 +36,7 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
   const chartData = useMemo(() => {
     const timestamps = new Map<string, Record<string, number>>()
     for (const r of data) {
+      if (!Number.isFinite(r.value)) continue
       const ts = r.timestamp
       if (!timestamps.has(ts)) timestamps.set(ts, {})
       timestamps.get(ts)![r.sensor_type] = r.value
