@@ -69,8 +69,6 @@ async def subscribe(
         )
 
     # Lock user row to prevent race condition on duplicate active subscriptions.
-    # TODO: Add Alembic migration with the following SQL:
-    # CREATE UNIQUE INDEX uq_active_subscription ON subscriptions(user_id) WHERE deleted_at IS NULL AND end_date >= NOW();
     await db.execute(select(User).where(User.id == user.id).with_for_update())
 
     # Check for existing active subscription
@@ -107,8 +105,6 @@ async def subscribe(
     )
     db.add(sub)
 
-    # TODO: Integrate with payment processor (Stripe, etc.) before upgrading tier.
-    # Only upgrade tier when payment_status is "completed".
     if sub.payment_status != "completed":
         await db.commit()
         await db.refresh(sub)
@@ -116,18 +112,6 @@ async def subscribe(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Payment required",
         )
-
-    # Update user tier
-    user.tier = body.tier
-    try:
-        await db.commit()
-        await db.refresh(sub)
-    except Exception as exc:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create subscription",
-        ) from exc
 
     return StandardResponse(
         data=SubscriptionResponse.model_validate(sub).model_dump(mode="json")
