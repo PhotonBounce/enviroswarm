@@ -187,9 +187,6 @@ async def nearby(
 
     nearby_stations = []
     for s in stations:
-        if sensor_type and sensor_type not in s.sensor_types:
-            continue
-
         d = _haversine(lat, lon, float(s.latitude), float(s.longitude))
         if d <= radius_km:
             item = NearbyStationResponse(

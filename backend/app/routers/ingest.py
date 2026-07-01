@@ -144,11 +144,10 @@ async def ingest(
 
         await db.commit()
 
-        return StandardResponse(data=result_data if idempotency_key else IngestResponse(inserted=len(readings)).model_dump(mode="json"))
+        return StandardResponse(data=result_data)
     except IntegrityError as exc:
         await db.rollback()
         if idempotency_key and key_hash:
-            # Narrow check: only mask as 409 if it's the idempotency unique constraint
             if "uq_idempotency_user_key" in str(exc.orig):
                 idem_result = await db.execute(
                     select(IdempotencyKey).where(
@@ -160,15 +159,14 @@ async def ingest(
                 cached = idem_result.scalar_one_or_none()
                 if cached:
                     return StandardResponse(data=cached.response)
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Database integrity error",
-                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Idempotency conflict or duplicate key",
+            ) from exc
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Idempotency conflict or duplicate key",
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database integrity error",
+        ) from exc
     except Exception:
         await db.rollback()
         raise

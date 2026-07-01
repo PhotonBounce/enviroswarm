@@ -18,8 +18,6 @@ from app.auth import decode_access_token
 from app.utils.crypto import hash_key, extract_prefix
 from app.constants import RATE_LIMITS
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
 # ---------------------------------------------------------------------------
 # In-memory rate-limit store: { key: (count, window_start) }
 # Replace with Redis in production.

@@ -1,8 +1,9 @@
 """Auth router: register, login, refresh, me."""
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 from uuid import UUID
 
 from app.auth import (
@@ -11,7 +12,6 @@ from app.auth import (
     decode_refresh_token,
     hash_password,
     verify_password,
-    validate_password,
     get_current_user,
     revoke_refresh_token,
 )
@@ -25,16 +25,19 @@ from app.schemas import (
     TokenResponse,
     UserResponse,
 )
+from app.config import get_settings
 from app.dependencies import check_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+settings = get_settings()
 
 
 # Cookie settings for web clients
 COOKIE_SETTINGS = {
     "key": "access_token",
     "httponly": True,
-    "secure": False,  # Set to True in production (HTTPS only)
+    "secure": settings.is_production,
     "samesite": "lax",
     "max_age": 3600,  # 1 hour
 }
@@ -42,7 +45,7 @@ COOKIE_SETTINGS = {
 REFRESH_COOKIE_SETTINGS = {
     "key": "refresh_token",
     "httponly": True,
-    "secure": False,
+    "secure": settings.is_production,
     "samesite": "lax",
     "max_age": 604800,  # 7 days
 }
@@ -67,11 +70,6 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
         )
-
-    try:
-        validate_password(body.password)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     user = User(
         email=body.email,
@@ -191,9 +189,21 @@ async def refresh_token(
 @router.post("/logout", response_model=StandardResponse)
 async def logout(
     response: Response,
+    request: Request,
+    body: Optional[RefreshTokenRequest] = None,
     user: User = Depends(get_current_user),
 ) -> StandardResponse:
     """Clear auth cookies and log out the user."""
+    refresh_token = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
+    if refresh_token:
+        try:
+            payload = decode_refresh_token(refresh_token)
+            jti = payload.get("jti")
+            if jti:
+                revoke_refresh_token(jti)
+        except HTTPException:
+            pass  # fail-safe: still clear cookies even if token is invalid
+
     response.delete_cookie(COOKIE_SETTINGS["key"])
     response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
     return StandardResponse(data={"logged_out": True})

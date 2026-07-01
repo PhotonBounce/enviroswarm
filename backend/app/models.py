@@ -6,7 +6,6 @@ from typing import List, Optional
 
 from sqlalchemy import (
     JSON,
-    ARRAY,
     CheckConstraint,
     DateTime,
     ForeignKey,
