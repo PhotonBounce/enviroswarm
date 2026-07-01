@@ -253,6 +253,8 @@ def start_subscriber(
         raise ValueError("ingest_timeout must be > 0")
     if max_retries < 0:
         raise ValueError("max_retries must be >= 0")
+    if run_duration_seconds is not None and run_duration_seconds < 0:
+        raise ValueError("run_duration_seconds must be >= 0")
 
     session = requests.Session()
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})

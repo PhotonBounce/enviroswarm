@@ -678,8 +678,12 @@ def main():
         raise ValueError("duration_months must be >= 1")
     if args.stations <= 0:
         raise ValueError("stations must be > 0")
-    if args.days < 0:
-        raise ValueError("days must be >= 0")
+    if args.days <= 0:
+        raise ValueError("days must be > 0")
+    if not args.email:
+        raise ValueError("email must not be empty")
+    if args.tier not in {"free", "pro", "enterprise"}:
+        raise ValueError("tier must be one of: free, pro, enterprise")
     if args.batch_delay < 0:
         raise ValueError("batch_delay must be >= 0")
     if args.ingest_timeout <= 0:
