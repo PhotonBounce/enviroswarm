@@ -33,7 +33,7 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const stationCount = stations?.length ?? 0
-    const activeSensorCount = stations?.filter(s => s.status === 'active').reduce((acc: number, s: SensorStation) => acc + s.sensor_types.length, 0) ?? 0
+    const activeSensorCount = stations?.filter(s => s.status === 'active')?.reduce((acc: number, s: SensorStation) => acc + s.sensor_types.length, 0) ?? 0
     const readingCount = todayResponse?.meta?.total ?? todayResponse?.readings?.length ?? 0
     return [
       { label: 'Stations', value: String(stationCount), icon: Radio, change: stationCount === 1 ? '1 station' : `${stationCount} stations` },

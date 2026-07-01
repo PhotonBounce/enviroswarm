@@ -106,7 +106,7 @@ export default function DataExplorer() {
   }
 
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
-  const stationNameMap = new Map(stations?.map((s) => [s.id, s.name]))
+  const stationNameMap = new Map((stations?.map((s) => [s.id, s.name]) ?? []))
 
   return (
     <div className="space-y-6">

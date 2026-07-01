@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
 
+import bcrypt
+
 from app.auth import (
     create_access_token,
     create_refresh_token,
@@ -33,6 +35,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 settings = get_settings()
 
+_DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt())
+
 
 # Cookie settings for web clients
 COOKIE_SETTINGS = {
@@ -40,7 +44,7 @@ COOKIE_SETTINGS = {
     "httponly": True,
     "secure": settings.is_production,
     "samesite": "lax",
-    "max_age": 3600,  # 1 hour
+    "max_age": settings.access_token_expire_minutes * 60,
 }
 
 REFRESH_COOKIE_SETTINGS = {
@@ -48,7 +52,7 @@ REFRESH_COOKIE_SETTINGS = {
     "httponly": True,
     "secure": settings.is_production,
     "samesite": "lax",
-    "max_age": 604800,  # 7 days
+    "max_age": settings.refresh_token_expire_days * 86400,
 }
 
 
@@ -133,7 +137,7 @@ async def login(
     user = result.scalar_one_or_none()
     if not user:
         # Dummy hash check to equalize timing and prevent email enumeration
-        verify_password(body.password, "$2b$12$00000000000000000000000000000000000000000000000000000")
+        verify_password(body.password, _DUMMY_HASH.decode("utf-8"))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
         )
@@ -164,13 +168,14 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     payload = await decode_refresh_token(body.refresh_token)
+
+    # Rate limit refresh by user_id
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
 
-    # Rate limit refresh by user_id
     if not await check_rate_limit(f"refresh:{user_id}", "/auth/refresh", 10):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

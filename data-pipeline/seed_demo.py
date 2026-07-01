@@ -357,6 +357,8 @@ def run_seed(
         raise ValueError("tier must be one of: free, pro, enterprise")
     if duration_months < 1:
         raise ValueError("duration_months must be >= 1")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be > 0")
 
     start_time = time.time()
     summary = {
@@ -368,10 +370,6 @@ def run_seed(
         "api_errors": 0,
         "elapsed_seconds": 0.0,
     }
-
-    if batch_size <= 0:
-        raise ValueError("batch_size must be > 0")
-
 
     created_stations: List[Dict[str, Any]] = []
     created_station_ids: List[str] = []

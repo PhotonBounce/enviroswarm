@@ -201,13 +201,14 @@ def _on_message_factory(q: queue.Queue):
     return _on_message
 
 
-def _drain_and_shutdown(q: queue.Queue, worker_thread: threading.Thread, client, timeout: float = 30.0):
+def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, worker_thread: threading.Thread, client, timeout: float = 30.0):
     """Gracefully drain the queue and shut down the worker thread."""
     print(f"[MQTT Sub] Draining queue ({q.qsize()} items remaining)...")
     drain_start = time.monotonic()
     while not q.empty() and time.monotonic() - drain_start < timeout:
         time.sleep(0.05)
     remaining = time.monotonic() - drain_start
+    stop_event.set()
     worker_thread.join(timeout=max(0.0, timeout - remaining))
     try:
         client.disconnect()
@@ -275,8 +276,7 @@ def start_subscriber(
     # Graceful shutdown on SIGTERM (Docker)
     def _signal_handler(signum, frame):
         print(f"[MQTT Sub] Received signal {signum}, shutting down gracefully...")
-        stop_event.set()
-        _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
+        _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, _signal_handler)
@@ -303,12 +303,10 @@ def start_subscriber(
             time.sleep(run_duration_seconds)
         except KeyboardInterrupt:
             print("[MQTT Sub] Stopped by user during timed run, shutting down gracefully...")
-            stop_event.set()
-            _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
+            _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
             print("[MQTT Sub] Stopped.")
             return
-        stop_event.set()
-        _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
+        _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
         print("[MQTT Sub] Stopped.")
     else:
         # Keep running until interrupted
@@ -317,8 +315,7 @@ def start_subscriber(
                 time.sleep(1)
         except KeyboardInterrupt:
             print("[MQTT Sub] Stopped by user, shutting down gracefully...")
-            stop_event.set()
-            _drain_and_shutdown(q, worker_thread, client, timeout=30.0)
+            _drain_and_shutdown(q, stop_event, worker_thread, client, timeout=30.0)
 
 
 def main():
