@@ -49,7 +49,10 @@ export default function ProfileScreen() {
 
           <Text style={styles.label}>Member Since</Text>
           <Text style={styles.value}>
-            {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
+            {(() => {
+              const d = user?.created_at ? new Date(user.created_at) : null;
+              return d && !isNaN(d.getTime()) ? d.toLocaleDateString() : '—';
+            })()}
           </Text>
         </View>
 

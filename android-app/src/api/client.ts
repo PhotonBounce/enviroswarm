@@ -38,7 +38,11 @@ apiClient.interceptors.request.use(
       return config;
     }
     if (cachedToken === null) {
-      cachedToken = await SecureStore.getItemAsync('access_token');
+      try {
+        cachedToken = await SecureStore.getItemAsync('access_token');
+      } catch (storeErr) {
+        cachedToken = null;
+      }
     }
     if (cachedToken) {
       config.headers.Authorization = `Bearer ${cachedToken}`;

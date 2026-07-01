@@ -69,10 +69,7 @@ export default function HomeScreen({ navigation }: Props) {
   }, [latitude, longitude]);
 
   const handleRefresh = async () => {
-    const loc = await getCurrentLocation();
-    if (loc?.latitude != null && loc?.longitude != null) {
-      fetchNearby(loc.latitude, loc.longitude);
-    }
+    await getCurrentLocation();
   };
 
   if (locLoading) {

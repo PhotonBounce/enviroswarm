@@ -78,13 +78,13 @@ export default function StationsScreen({ navigation }: Props) {
       Alert.alert('Validation', 'Name and at least one sensor type required');
       return;
     }
-    const latVal = lat.trim() !== '' ? parseFloat(lat) : null;
-    const lonVal = lon.trim() !== '' ? parseFloat(lon) : null;
-    if (lat.trim() === '' || !Number.isFinite(latVal)) {
+    const latVal = lat.trim() !== '' ? parseFloat(lat) : NaN;
+    const lonVal = lon.trim() !== '' ? parseFloat(lon) : NaN;
+    if (!Number.isFinite(latVal)) {
       Alert.alert('Validation', 'Latitude must be a valid number');
       return;
     }
-    if (lon.trim() === '' || !Number.isFinite(lonVal)) {
+    if (!Number.isFinite(lonVal)) {
       Alert.alert('Validation', 'Longitude must be a valid number');
       return;
     }

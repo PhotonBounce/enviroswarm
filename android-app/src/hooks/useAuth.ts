@@ -21,7 +21,11 @@ export function useAuth() {
         setUser(res.data.data);
         return res.data.data;
       } else {
-        await SecureStore.deleteItemAsync('access_token');
+        try {
+          await SecureStore.deleteItemAsync('access_token');
+        } catch (storeErr) {
+          // ignore SecureStore errors; preserve original error
+        }
         clearCachedToken();
         setUser(null);
         throw new Error(res.data?.error || 'Session validation failed');
