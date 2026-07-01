@@ -10,7 +10,7 @@ import { useUpdateUser } from '@/hooks/useApi'
 import { formatDate } from '@/lib/utils'
 
 export default function Profile() {
-  const { user, tier } = useAuth()
+  const { user, tier, setUser } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState(user?.email ?? '')
   const [isEditing, setIsEditing] = useState(false)
@@ -39,7 +39,8 @@ export default function Profile() {
     enterprise: 'default' as const,
   }
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
     setSaveError('')
     setSaveSuccess(false)
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -47,7 +48,8 @@ export default function Profile() {
       return
     }
     try {
-      await updateUser.mutateAsync({ email })
+      const updatedUser = await updateUser.mutateAsync({ email })
+      setUser(updatedUser)
       setSaveSuccess(true)
       setIsEditing(false)
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -102,42 +104,44 @@ export default function Profile() {
             <CardDescription>Update your account information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                  disabled={!isEditing}
-                  className="pl-9"
-                />
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                    disabled={!isEditing}
+                    className="pl-9"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <div className="relative">
-                <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input type="password" value="••••••••" disabled className="pl-9" />
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Password</label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input type="password" value="••••••••" disabled className="pl-9" />
+                </div>
               </div>
-            </div>
-            {saveError && <p className="text-sm text-red-400">{saveError}</p>}
-            {saveSuccess && <p className="text-sm text-emerald-400">Profile updated successfully!</p>}
-            <div className="flex gap-2">
-              {isEditing ? (
-                <>
-                  <Button onClick={() => { setIsEditing(false); setEmail(user?.email ?? ''); setSaveError(''); setSaveSuccess(false) }} variant="outline">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleSave} disabled={updateUser.isPending}>
-                    {updateUser.isPending ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
-              )}
-            </div>
+              {saveError && <p className="text-sm text-red-400">{saveError}</p>}
+              {saveSuccess && <p className="text-sm text-emerald-400">Profile updated successfully!</p>}
+              <div className="flex gap-2">
+                {isEditing ? (
+                  <>
+                    <Button type="button" onClick={() => { setIsEditing(false); setEmail(user?.email ?? ''); setSaveError(''); setSaveSuccess(false) }} variant="outline">
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={updateUser.isPending}>
+                      {updateUser.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" onClick={() => setIsEditing(true)}>Edit Profile</Button>
+                )}
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>

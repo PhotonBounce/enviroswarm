@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { AxiosError } from 'axios';
 import { apiClient, authEvents, clearCachedToken } from '../api/client';
 import { User, AuthTokens, ApiResponse } from '../types';
 
@@ -22,15 +23,18 @@ export function useAuth() {
         return res.data.data;
       } else {
         await SecureStore.deleteItemAsync('access_token');
+        clearCachedToken();
         setUser(null);
         throw new Error(res.data?.error || 'Session validation failed');
       }
-    } catch (err: any) {
-      console.error('Auth check failed:', err?.message || err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Auth check failed:', message);
       // Only clear the session on 401 (unauthorized). For 403, 500, or network
       // errors, preserve the token so the user can retry later.
-      if (err?.response?.status === 401) {
+      if (err instanceof AxiosError && err.response?.status === 401) {
         await SecureStore.deleteItemAsync('access_token');
+        clearCachedToken();
         setUser(null);
       }
       throw err;

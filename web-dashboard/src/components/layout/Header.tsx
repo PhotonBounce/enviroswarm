@@ -62,6 +62,17 @@ export default function Header() {
     }
   }, [mobileOpen])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node) && hamburgerRef.current && !hamburgerRef.current.contains(event.target as Node)) {
+        setMobileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [mobileOpen])
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
       <div className="flex h-16 items-center justify-between px-4 md:pl-72">

@@ -22,6 +22,14 @@ export default function Register() {
       setError('Passwords do not match')
       return
     }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {
+      setError('Password must contain uppercase, lowercase, and numeric characters')
+      return
+    }
     try {
       await registerMutation.mutateAsync({ email: email.trim(), password })
       // Cookie is set by backend (httpOnly). Browser sends it automatically.

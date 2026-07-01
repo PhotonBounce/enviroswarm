@@ -9,7 +9,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import SensorChart from '@/components/charts/SensorChart'
 import { useStations, useSensorData } from '@/hooks/useApi'
-import { formatDate, capitalize } from '@/lib/utils'
+import { formatDate, capitalize, formatNumber } from '@/lib/utils'
 import type { SensorType, SensorReading } from '@/types'
 
 const sensorOptions: SensorType[] = [
@@ -221,7 +221,7 @@ export default function DataExplorer() {
                           <TableCell>
                             <Badge variant="outline">{capitalize(reading.sensor_type)}</Badge>
                           </TableCell>
-                          <TableCell className="font-mono">{typeof reading.value === 'number' ? reading.value.toFixed(3) : reading.value}</TableCell>
+                          <TableCell className="font-mono">{typeof reading.value === 'number' ? formatNumber(reading.value, 3) : reading.value}</TableCell>
                           <TableCell>{reading.unit}</TableCell>
                         </TableRow>
                       ))}

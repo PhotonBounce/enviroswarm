@@ -19,7 +19,7 @@ function App() {
   const { data: meData } = useMe()
 
   useEffect(() => {
-    if (meData && !user) {
+    if (meData) {
       setUser(meData)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

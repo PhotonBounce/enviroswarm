@@ -14,7 +14,7 @@ export function SensorCard({ reading }: SensorCardProps) {
     <View style={styles.card}>
       <Text style={styles.type}>{reading.sensor_type.replace(/_/g, ' ').toUpperCase()}</Text>
       <Text style={styles.value}>
-        {typeof reading.value === 'number' ? reading.value.toFixed(2) : reading.value} {unit}
+        {typeof reading.value === 'number' ? (Number.isFinite(reading.value) ? reading.value.toFixed(2) : '—') : reading.value} {unit}
       </Text>
       <Text style={styles.timestamp}>{timestampStr}</Text>
     </View>

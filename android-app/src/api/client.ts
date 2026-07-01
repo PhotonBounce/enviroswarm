@@ -33,6 +33,9 @@ export function clearCachedToken() {
 
 apiClient.interceptors.request.use(
   async (config) => {
+    if (config.url === '/auth/login' || config.url === '/auth/register') {
+      return config;
+    }
     if (cachedToken === null) {
       cachedToken = await SecureStore.getItemAsync('access_token');
     }

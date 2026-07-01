@@ -3,7 +3,7 @@ import { Radio, BarChart3, Zap } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { useStations, useSensorData } from '@/hooks/useApi'
-import { capitalize, formatDate } from '@/lib/utils'
+import { capitalize, formatDate, formatNumber } from '@/lib/utils'
 import type { SensorStation } from '@/types'
 
 export default function Dashboard() {
@@ -39,7 +39,7 @@ export default function Dashboard() {
       const sorted = [...todayResponse.readings].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 4)
       return sorted.map((reading) => ({
         id: reading.id,
-        title: `${capitalize(reading.sensor_type)}: ${typeof reading.value === 'number' ? reading.value.toFixed(2) : reading.value} ${reading.unit}`,
+        title: `${capitalize(reading.sensor_type)}: ${typeof reading.value === 'number' ? formatNumber(reading.value, 2) : reading.value} ${reading.unit}`,
         time: formatDate(reading.timestamp),
         type: 'reading' as const,
       }))
