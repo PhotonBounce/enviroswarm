@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Key, Plus, Copy, Trash2, AlertTriangle, Check } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -149,7 +149,7 @@ export default function ApiKeys() {
         </Card>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open && newKey) return; setDialogOpen(open) }} onPointerDownOutside={(e) => { if (newKey) e.preventDefault() }}>
         <DialogHeader>
           <DialogTitle>Generate API Key</DialogTitle>
           <DialogDescription>Create a new API key for programmatic access</DialogDescription>

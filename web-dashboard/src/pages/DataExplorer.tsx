@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Search, Download, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -101,7 +101,9 @@ export default function DataExplorer() {
     const a = document.createElement('a')
     a.href = url
     a.download = 'sensor-data.csv'
+    document.body.appendChild(a)
     a.click()
+    document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 

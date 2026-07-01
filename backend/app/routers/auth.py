@@ -12,6 +12,7 @@ import bcrypt
 from app.auth import (
     create_access_token,
     create_refresh_token,
+    decode_access_token,
     decode_refresh_token,
     hash_password,
     verify_password,
@@ -171,11 +172,6 @@ async def refresh_token(
 
     # Rate limit refresh by user_id
     user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
-        )
-
     if not await check_rate_limit(f"refresh:{user_id}", "/auth/refresh", 10):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -229,11 +225,26 @@ async def logout(
     response: Response,
     request: Request,
     body: Optional[RefreshTokenRequest] = None,
-    user: User = Depends(get_current_user),
 ) -> StandardResponse:
     """Clear auth cookies and log out the user."""
+    token_found = False
+
+    # Try access token from header or cookie
+    auth_header = request.headers.get("Authorization", "")
+    access_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+    if not access_token:
+        access_token = request.cookies.get("access_token")
+    if access_token:
+        try:
+            await decode_access_token(access_token)
+            token_found = True
+        except HTTPException:
+            pass
+
+    # Fallback to refresh token from cookie or body
     refresh_token = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
     if refresh_token:
+        token_found = True
         try:
             payload = await decode_refresh_token(refresh_token)
             jti = payload.get("jti")
@@ -245,9 +256,12 @@ async def logout(
         except HTTPException:
             pass  # fail-safe: still clear cookies even if token is invalid
 
-    response.delete_cookie(COOKIE_SETTINGS["key"])
-    response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
-    return StandardResponse(data={"logged_out": True})
+    if token_found:
+        response.delete_cookie(COOKIE_SETTINGS["key"])
+        response.delete_cookie(REFRESH_COOKIE_SETTINGS["key"])
+        return StandardResponse(data={"logged_out": True})
+
+    return StandardResponse(data={"logged_out": False}, error="No token found")
 
 
 @router.get("/me", response_model=StandardResponse)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useId, createContext, useContext } from 'react'
+import React, { useEffect, useRef, useCallback, useId, createContext, useContext } from 'react'
 import { cn } from '@/lib/utils'
 
 const DialogContext = createContext<{ titleId: string; descriptionId: string } | null>(null)
@@ -7,9 +7,10 @@ interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  onPointerDownOutside?: (e: React.PointerEvent) => void
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: DialogProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
   const titleId = useId()
@@ -32,6 +33,17 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       }
     } else if (previousActiveElement.current) {
       previousActiveElement.current.focus()
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
     }
   }, [open])
 
@@ -68,7 +80,12 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => onOpenChange(false)}
+        onPointerDown={(e) => {
+          onPointerDownOutside?.(e)
+          if (!e.defaultPrevented) {
+            onOpenChange(false)
+          }
+        }}
         aria-hidden="true"
       />
       <DialogContext.Provider value={{ titleId, descriptionId }}>

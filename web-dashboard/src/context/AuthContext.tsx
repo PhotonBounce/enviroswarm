@@ -1,4 +1,4 @@
-import { createContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useState, useCallback, useEffect } from 'react'
 import type { User, UserTier } from '@/types'
 import api from '@/lib/api'
 import { AxiosError } from 'axios'

@@ -1,6 +1,7 @@
 """Pydantic v2 schemas for request/response validation."""
 
 from datetime import datetime, timezone
+import math
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -109,8 +110,10 @@ class StationUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_latitude_longitude(self) -> "StationUpdateRequest":
-        if (self.latitude is not None) != (self.longitude is not None):
-            raise ValueError("latitude and longitude must both be set or both be null")
+        lat_set = "latitude" in self.model_fields_set
+        lon_set = "longitude" in self.model_fields_set
+        if lat_set != lon_set:
+            raise ValueError("latitude and longitude must both be provided or both be omitted")
         return self
 
 
@@ -196,6 +199,8 @@ class SensorReadingPayload(BaseModel):
     @field_validator("value", mode="after")
     @classmethod
     def validate_value_bounds(cls, v: float) -> float:
+        if math.isnan(v):
+            raise ValueError("Value cannot be NaN")
         if abs(v) >= 1e9:
             raise ValueError("value must be between -1e9 and 1e9")
         return v

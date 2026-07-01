@@ -57,7 +57,7 @@ class User(Base):
 
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_user_tier"),
-        UniqueConstraint("email", postgresql_where=(deleted_at.is_(None)), name="uq_users_email"),
+        UniqueConstraint("email", name="uq_users_email"),
     )
 
 

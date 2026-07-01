@@ -17,6 +17,7 @@ from app.schemas import (
     StandardResponse,
     DataQueryResponse,
     NearbyStationResponse,
+    SENSOR_TYPES,
 )
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -32,7 +33,7 @@ def _date_trunc(unit, column):
 @router.get("", response_model=StandardResponse)
 async def query_data(
     station_id: Optional[UUID] = Query(None),
-    sensor_type: Optional[str] = Query(None, pattern="^(air_quality|temperature|humidity|noise_level|radiation|water_quality|co2|pm25|pm10|voc)$"),
+    sensor_type: Optional[str] = Query(None, pattern=f'^({"|".join(SENSOR_TYPES)})$'),
     start: Optional[datetime] = Query(None),
     end: Optional[datetime] = Query(None),
     limit: int = Query(100, ge=1, le=10000),
@@ -154,7 +155,7 @@ async def nearby(
     lat: float = Query(..., ge=-90, le=90),
     lon: float = Query(..., ge=-180, le=180),
     radius_km: float = Query(10, ge=0.1, le=500),
-    sensor_type: Optional[str] = Query(None, pattern="^(air_quality|temperature|humidity|noise_level|radiation|water_quality|co2|pm25|pm10|voc)$"),
+    sensor_type: Optional[str] = Query(None, pattern=f'^({"|".join(SENSOR_TYPES)})$'),
     user: User = Depends(rate_limit_dependency),
     _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),

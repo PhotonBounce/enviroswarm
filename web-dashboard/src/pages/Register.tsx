@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Leaf, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'

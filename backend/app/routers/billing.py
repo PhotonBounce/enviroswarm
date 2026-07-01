@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -80,7 +81,13 @@ async def subscribe(
             Subscription.end_date >= now,
         )
     )
-    existing_sub = existing_result.scalar_one_or_none()
+    try:
+        existing_sub = existing_result.scalar_one_or_none()
+    except MultipleResultsFound:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Multiple active subscriptions found",
+        )
     if existing_sub:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

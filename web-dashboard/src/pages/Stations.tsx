@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Radio, Plus, MapPin } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -41,6 +41,10 @@ export default function Stations() {
     const lonNum = parseFloat(longitude)
     if (isNaN(latNum) || isNaN(lonNum)) {
       setFormError('Latitude and longitude must be valid numbers')
+      return
+    }
+    if (latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180) {
+      setFormError('Latitude and longitude must be within valid ranges')
       return
     }
     try {
