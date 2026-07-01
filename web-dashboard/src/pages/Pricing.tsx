@@ -127,9 +127,12 @@ export default function Pricing() {
                 Contact us for data licensing, bulk exports, and custom SLA agreements.
               </p>
             </div>
-            <Button variant="outline" asChild>
-              <a href="mailto:sales@enviroswarm.example.com?subject=Enterprise%20Inquiry">Contact Sales</a>
-            </Button>
+            <a
+              href="mailto:sales@enviroswarm.example.com?subject=Enterprise%20Inquiry"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              Contact Sales
+            </a>
           </div>
         </CardContent>
       </Card>
