@@ -51,70 +51,133 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
     )
   }
 
-  const ChartComponent = type === 'area' ? AreaChart : LineChart
-
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <ChartComponent data={chartData}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-        <XAxis
-          dataKey="timestamp"
-          stroke="#9ca3af"
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-          angle={-45}
-          height={60}
-          tickFormatter={(ts: string) =>
-            new Date(ts).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          }
-        />
-        <YAxis
-          stroke="#9ca3af"
-          fontSize={12}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(value: number) => formatNumber(value, 1)}
-        />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: '#1f2937',
-            border: '1px solid #374151',
-            borderRadius: '0.5rem',
-            color: '#f3f4f6',
-          }}
-          formatter={(value: number, name: string) => [formatNumber(value, 2), name]}
-        />
-        {showLegend && <Legend wrapperStyle={{ maxHeight: 80, overflowY: 'auto' }} />}
-        {types.map((sensorType) => (
-          type === 'area' ? (
-            <Area
-              key={sensorType}
-              type="monotone"
-              dataKey={sensorType}
-              stroke={getSensorTypeColor(sensorType)}
-              fill={getSensorTypeColor(sensorType)}
-              fillOpacity={0.2}
-              strokeWidth={2}
-              dot={false}
+    <figure aria-label="Sensor time-series chart">
+      <figcaption className="sr-only">
+        Sensor time-series chart showing {types.join(', ')} data
+      </figcaption>
+      <ResponsiveContainer width="100%" height={320}>
+        {type === 'area' ? (
+          <AreaChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey="timestamp"
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              angle={-45}
+              height={60}
+              tickFormatter={(ts: string) =>
+                new Date(ts).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }
             />
-          ) : (
-            <Line
-              key={sensorType}
-              type="monotone"
-              dataKey={sensorType}
-              stroke={getSensorTypeColor(sensorType)}
-              strokeWidth={2}
-              dot={false}
+            <YAxis
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => formatNumber(value, 1)}
             />
-          )
-        ))}
-      </ChartComponent>
-    </ResponsiveContainer>
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+                borderRadius: '0.5rem',
+                color: '#f3f4f6',
+              }}
+              formatter={(value: number, name: string) => [formatNumber(value, 2), name]}
+            />
+            {showLegend && <Legend wrapperStyle={{ maxHeight: 80, overflowY: 'auto' }} />}
+            {types.map((sensorType) => (
+              <Area
+                key={sensorType}
+                type="monotone"
+                dataKey={sensorType}
+                stroke={getSensorTypeColor(sensorType)}
+                fill={getSensorTypeColor(sensorType)}
+                fillOpacity={0.2}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))}
+          </AreaChart>
+        ) : (
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey="timestamp"
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              angle={-45}
+              height={60}
+              tickFormatter={(ts: string) =>
+                new Date(ts).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }
+            />
+            <YAxis
+              stroke="#9ca3af"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => formatNumber(value, 1)}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1f2937',
+                border: '1px solid #374151',
+                borderRadius: '0.5rem',
+                color: '#f3f4f6',
+              }}
+              formatter={(value: number, name: string) => [formatNumber(value, 2), name]}
+            />
+            {showLegend && <Legend wrapperStyle={{ maxHeight: 80, overflowY: 'auto' }} />}
+            {types.map((sensorType) => (
+              <Line
+                key={sensorType}
+                type="monotone"
+                dataKey={sensorType}
+                stroke={getSensorTypeColor(sensorType)}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))}
+          </LineChart>
+        )}
+      </ResponsiveContainer>
+      <table className="sr-only">
+        <caption>Sensor data values</caption>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            {types.map((t) => (
+              <th key={t}>{t}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {chartData.map((row, i) => (
+            <tr key={i}>
+              <td>{row.timestamp}</td>
+              {types.map((t) => (
+                <td key={t}>{(row as Record<string, number | undefined>)[t] ?? 'N/A'}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
   )
 }
