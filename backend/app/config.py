@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = "postgresql+asyncpg://enviroswarm:enviroswarm@localhost:5432/enviroswarm"
+    database_url: str = Field(...)
     db_pool_size: int = 20
     db_max_overflow: int = 10
     db_pool_recycle: int = 3600
