@@ -314,6 +314,7 @@ class PricingTier(BaseModel):
 class SubscriptionRequest(BaseModel):
     tier: str = Field(..., pattern="^(pro|enterprise)$")
     duration_months: int = Field(1, ge=1, le=12)
+    payment_intent_id: str = Field(..., min_length=1)
 
 class SubscriptionResponse(BaseModel):
     id: UUID
@@ -322,6 +323,7 @@ class SubscriptionResponse(BaseModel):
     start_date: datetime
     end_date: datetime
     payment_status: str
+    payment_intent_id: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

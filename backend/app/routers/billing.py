@@ -55,6 +55,14 @@ async def get_pricing() -> StandardResponse:
     return StandardResponse(data=[t.model_dump() for t in PRICING_TIERS])
 
 
+
+def _verify_payment_intent(payment_intent_id: str) -> bool:
+    """Placeholder for payment gateway verification (e.g., Stripe)."""
+    if not payment_intent_id or not payment_intent_id.startswith("pi_"):
+        return False
+    return True
+
+
 @router.post("/subscribe", response_model=StandardResponse)
 async def subscribe(
     body: SubscriptionRequest,
@@ -66,6 +74,12 @@ async def subscribe(
     if body.tier not in tier_names:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier"
+        )
+
+    if not _verify_payment_intent(body.payment_intent_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment verification failed",
         )
 
     # Lock user row to prevent race condition on duplicate active subscriptions.
@@ -102,6 +116,7 @@ async def subscribe(
         start_date=start_date,
         end_date=end_date,
         payment_status="completed",
+        payment_intent_id=body.payment_intent_id,
     )
     db.add(sub)
     user.tier = body.tier
