@@ -5,34 +5,26 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLogin } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
-import api from '@/lib/api'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const loginMutation = useLogin()
-  const { login, logout } = useAuth()
+  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     try {
       await loginMutation.mutateAsync({ email: email.trim(), password })
-      // Cookie is set by backend (httpOnly). Browser sends it automatically.
-      // Fetch user profile.
-      try {
-        const userData = await api.get('/me')
-        if (userData.data?.success) {
-          login(userData.data.data)
-        } else {
-          setError(userData.data?.error || 'Failed to load user')
-        }
-      } catch (fetchErr: unknown) {
-        const fetchMessage = fetchErr instanceof Error ? fetchErr.message : 'Failed to load user'
-        setError(fetchMessage)
-        logout()
-      }
+      login({
+        id: '',
+        email: email.trim(),
+        tier: 'free',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'
       setError(message)
