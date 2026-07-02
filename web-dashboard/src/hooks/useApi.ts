@@ -17,6 +17,7 @@ import type {
 
 // Auth
 export function useLogin() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: LoginRequest) => {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', data)
@@ -25,10 +26,14 @@ export function useLogin() {
       }
       return res.data.data
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
   })
 }
 
 export function useRegister() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (data: RegisterRequest) => {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/register', data)
@@ -36,6 +41,9 @@ export function useRegister() {
         throw new Error(res.data?.error || 'Registration failed')
       }
       return res.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] })
     },
   })
 }
