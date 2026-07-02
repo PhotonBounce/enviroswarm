@@ -1,5 +1,6 @@
 """MQTT subscriber — subscribe to sensor topics and forward to the ingest API."""
 
+import uuid
 import argparse
 import gzip
 import json
@@ -19,20 +20,8 @@ except ImportError:
 
 import requests
 
+from utils import _safe_int, _safe_float
 
-
-def _safe_int(env_var: str, default: int) -> int:
-    try:
-        return int(os.getenv(env_var, str(default)))
-    except (ValueError, TypeError):
-        return default
-
-
-def _safe_float(env_var: str, default: float) -> float:
-    try:
-        return float(os.getenv(env_var, str(default)))
-    except (ValueError, TypeError):
-        return default
 
 
 DEFAULT_MAX_QUEUE_SIZE = _safe_int("MQTT_MAX_QUEUE_SIZE", 1000)
@@ -67,7 +56,7 @@ def _post_with_retry(
         headers["Authorization"] = f"Bearer {auth_token}"
 
     body = {"readings": [payload]}
-    raw_json = json.dumps(body).encode("utf-8")
+    raw_json = json.dumps(body, sort_keys=True).encode("utf-8")
     if len(raw_json) > 1024:
         compressed = gzip.compress(raw_json)
         headers["Content-Encoding"] = "gzip"
@@ -98,7 +87,7 @@ def _post_with_retry(
                     else:
                         print(f"[MQTT Sub] API success=False: {body_json.get('error', 'unknown')}")
                         return False
-                except Exception:
+                except json.JSONDecodeError:
                     print("[MQTT Sub] Forwarded -> API OK (non-JSON response)")
                     return True
             elif resp.status_code in (408, 429, 500, 502, 503, 504):
@@ -133,7 +122,7 @@ def _start_worker(
     max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
     ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
     max_retries: int = DEFAULT_INGEST_RETRY,
-) -> tuple:
+) -> tuple[queue.Queue, threading.Event, dict]:
     """Start a background worker thread that drains a queue and POSTs to the API."""
     q: queue.Queue = queue.Queue(maxsize=max_queue_size)
     stop_event = threading.Event()
@@ -194,6 +183,10 @@ def _on_message_factory(q: queue.Queue):
             print(f"[MQTT Sub] Invalid JSON on {msg.topic}: {e}")
             return
 
+        if not isinstance(payload, dict):
+            print(f"[MQTT Sub] Invalid payload type on {msg.topic}: expected dict, got {type(payload).__name__}")
+            return
+
         try:
             q.put_nowait(payload)
         except queue.Full:
@@ -202,7 +195,7 @@ def _on_message_factory(q: queue.Queue):
     return _on_message
 
 
-def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, thread_ref: dict, client, session: Optional[requests.Session] = None, timeout: float = 30.0):
+def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, thread_ref: dict, client, session: Optional[requests.Session] = None, timeout: float = 30.0) -> None:
     """Gracefully drain the queue and shut down the worker thread."""
     print(f"[MQTT Sub] Draining queue ({q.qsize()} items remaining)...")
     drain_start = time.monotonic()
@@ -213,9 +206,12 @@ def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, thread_ref:
     thread_ref["thread"].join(timeout=max(0.0, timeout - remaining))
     try:
         client.disconnect()
+    except Exception as e:
+        print(f"[MQTT Sub] Warning: cleanup error during disconnect: {e}")
+    try:
         client.loop_stop()
     except Exception as e:
-        print(f"[MQTT Sub] Warning: cleanup error during disconnect/loop_stop: {e}")
+        print(f"[MQTT Sub] Warning: cleanup error during loop_stop: {e}")
     if session is not None:
         try:
             session.close()
@@ -271,7 +267,7 @@ def start_subscriber(
     )
 
     client = mqtt.Client(
-        client_id=client_id or "enviroswarm-sub-001",
+        client_id=client_id or f"enviroswarm-sub-{uuid.uuid4().hex[:8]}",
         clean_session=False,
     )
     client.user_data_set({"topic_prefix": topic_prefix})
