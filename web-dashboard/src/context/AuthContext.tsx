@@ -1,7 +1,6 @@
-import React, { createContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react'
 import type { User, UserTier } from '@/types'
 import api from '@/lib/api'
-import { AxiosError } from 'axios'
 
 interface AuthContextType {
   user: User | null
@@ -25,26 +24,7 @@ export const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Check auth status on mount via cookie (browser sends httpOnly cookie automatically)
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await api.get('/me')
-        if (response.data?.success) {
-          setUserState(response.data.data)
-        }
-      } catch (err: unknown) {
-        if (err instanceof AxiosError && err.response?.status === 401) {
-          setUserState(null)
-        }
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    checkAuth()
-  }, [])
+  const [isLoading, setIsLoading] = useState(false)
 
   // Listen for unauthorized events from the API interceptor
   useEffect(() => {
@@ -74,18 +54,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserState(newUser)
   }, [])
 
+  const value = useMemo(() => ({
+    user,
+    isLoading,
+    login,
+    logout,
+    setUser,
+    isAuthenticated: !!user,
+    tier: user?.tier ?? 'free',
+  }), [user, isLoading, login, logout, setUser])
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        login,
-        logout,
-        setUser,
-        isAuthenticated: !!user,
-        tier: user?.tier ?? 'free',
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
