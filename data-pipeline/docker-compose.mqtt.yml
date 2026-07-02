@@ -1,10 +1,14 @@
+# WARNING: This compose file is for LOCAL DEVELOPMENT ONLY.
+# Do not use in production or on any shared network without switching to
+# mosquitto.conf.production and configuring TLS + authentication.
+
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0.18
     container_name: enviroswarm-mqtt
     ports:
-      - "1883:1883"   # MQTT
-      - "9001:9001"   # WebSocket
+      - "127.0.0.1:1883:1883"   # MQTT — localhost only
+      - "127.0.0.1:9001:9001"   # WebSocket — localhost only
     volumes:
       - ./mqtt/config:/mosquitto/config
       - ./mqtt/data:/mosquitto/data
