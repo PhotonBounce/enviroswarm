@@ -60,7 +60,7 @@ export default function Pricing() {
       </div>
 
       {toast && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
+        <div role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
           {toast.message}
         </div>
       )}
@@ -95,8 +95,8 @@ export default function Pricing() {
               </CardHeader>
               <CardContent className="flex-1">
                 <ul className="space-y-3">
-                  {t.features.map((feature: string) => (
-                    <li key={feature} className="flex items-start gap-2">
+                  {t.features.map((feature: string, index: number) => (
+                    <li key={`${t.tier}-${feature}-${index}`} className="flex items-start gap-2">
                       <Check className="mt-0.5 h-4 w-4 text-emerald-400 shrink-0" />
                       <span className="text-sm">{feature}</span>
                     </li>

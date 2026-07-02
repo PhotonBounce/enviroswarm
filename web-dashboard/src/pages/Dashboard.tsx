@@ -14,7 +14,11 @@ export default function Dashboard() {
   useEffect(() => {
     const onFocus = () => setRefreshKey((k) => k + 1)
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    const interval = setInterval(() => setRefreshKey((k) => k + 1), 60000)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      clearInterval(interval)
+    }
   }, [])
 
   const today = useMemo(() => {

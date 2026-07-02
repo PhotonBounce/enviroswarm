@@ -8,13 +8,13 @@ import { Badge } from '@/components/ui/Badge'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/Dialog'
 import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
-import type { ApiKey, ApiKeyCreateResponse } from '@/types'
+import type { ApiKey } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 export default function ApiKeys() {
   const { tier } = useAuth()
   const navigate = useNavigate()
-  const { data: apiKeys, isLoading } = useApiKeys()
+  const { data: apiKeys, isLoading, error: apiKeysError } = useApiKeys()
   const createApiKey = useCreateApiKey()
   const deleteApiKey = useDeleteApiKey()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -98,7 +98,7 @@ export default function ApiKeys() {
   return (
     <div className="space-y-6">
       {toast && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
+        <div role={toast.type === 'error' ? 'alert' : 'status'} className={`rounded-lg border px-4 py-3 text-sm ${toast.type === 'success' ? 'border-emerald-600/30 bg-emerald-900/20 text-emerald-400' : 'border-red-600/30 bg-red-900/20 text-red-400'}`}>
           {toast.message}
         </div>
       )}
@@ -115,6 +115,11 @@ export default function ApiKeys() {
 
       {isLoading ? (
         <div className="text-center text-muted-foreground py-12">Loading keys...</div>
+      ) : apiKeysError ? (
+        <div className="text-center text-red-400 py-12">
+          <p>Failed to load API keys</p>
+          <p className="text-xs">{apiKeysError instanceof Error ? apiKeysError.message : 'Unknown error'}</p>
+        </div>
       ) : apiKeys && apiKeys.length > 0 ? (
         <div className="space-y-3">
           {apiKeys.map((key: ApiKey) => (
@@ -127,7 +132,7 @@ export default function ApiKeys() {
                     <Badge variant="outline">{key.rate_limit_per_min}/min</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground font-mono">
-                    {key.key_hash?.substring(0, 8) ?? ''}...{key.key_hash?.substring(key.key_hash.length - 8) ?? ''}
+                    {key.key_hash.substring(0, 8)}...{key.key_hash.substring(key.key_hash.length - 8)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Created {formatDate(key.created_at)}

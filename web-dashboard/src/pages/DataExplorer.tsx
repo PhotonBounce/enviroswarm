@@ -37,7 +37,7 @@ export default function DataExplorer() {
     page?: number
   }>({})
 
-  const { data: response, isLoading } = useSensorData(queryParams)
+  const { data: response, isLoading, error: queryError } = useSensorData(queryParams)
   const readings = response?.readings ?? []
   const meta = response?.meta
 
@@ -186,6 +186,10 @@ export default function DataExplorer() {
             <CardContent>
               {isLoading ? (
                 <div className="flex h-64 items-center justify-center text-muted-foreground">Loading data...</div>
+              ) : queryError ? (
+                <div className="flex h-64 items-center justify-center text-red-400">
+                  Error loading data: {queryError instanceof Error ? queryError.message : 'Unknown error'}
+                </div>
               ) : (
                 <SensorChart data={readings} />
               )}
@@ -203,6 +207,11 @@ export default function DataExplorer() {
             <CardContent>
               {isLoading ? (
                 <div className="text-center text-muted-foreground py-8">Loading...</div>
+              ) : queryError ? (
+                <div className="text-center text-red-400 py-8">
+                  <p>Error loading data</p>
+                  <p className="text-xs">{queryError instanceof Error ? queryError.message : 'Unknown error'}</p>
+                </div>
               ) : readings.length > 0 ? (
                 <>
                   <Table>

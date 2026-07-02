@@ -22,8 +22,6 @@ export default function Header() {
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
 
-  const notificationCount = 0
-
   useEffect(() => {
     if (!notificationsOpen) return
     const handleClickOutside = (event: MouseEvent) => {
@@ -100,11 +98,6 @@ export default function Header() {
               aria-expanded={notificationsOpen}
             >
               <Bell className="h-5 w-5 text-muted-foreground" />
-              {notificationCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {notificationCount}
-                </span>
-              )}
             </button>
             {notificationsOpen && (
               <div className="absolute right-0 mt-2 w-72 rounded-lg border border-border bg-card shadow-lg z-50">

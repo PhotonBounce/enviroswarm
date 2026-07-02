@@ -43,7 +43,7 @@ api.interceptors.response.use(
         window.dispatchEvent(new CustomEvent('enviroswarm:unauthorized'))
         setTimeout(() => {
           isRedirecting = false
-        }, 100)
+        }, 1000)
       }
     }
     return Promise.reject(error)

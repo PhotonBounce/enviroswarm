@@ -1,7 +1,12 @@
-import React, { useEffect, useRef, useCallback, useId, createContext, useContext } from 'react'
+import React, { useEffect, useRef, useCallback, useId, createContext, useContext, useState } from 'react'
 import { cn } from '@/lib/utils'
 
-const DialogContext = createContext<{ titleId: string; descriptionId: string } | null>(null)
+const DialogContext = createContext<{
+  titleId: string
+  descriptionId: string
+  registerTitle: () => void
+  registerDescription: () => void
+} | null>(null)
 
 interface DialogProps {
   open: boolean
@@ -15,6 +20,8 @@ export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: D
   const previousActiveElement = useRef<HTMLElement | null>(null)
   const titleId = useId()
   const descriptionId = useId()
+  const [hasTitle, setHasTitle] = useState(false)
+  const [hasDescription, setHasDescription] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -31,8 +38,11 @@ export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: D
           content.focus()
         }
       }
-    } else if (previousActiveElement.current) {
-      previousActiveElement.current.focus()
+    }
+    return () => {
+      if (open && previousActiveElement.current) {
+        previousActiveElement.current.focus()
+      }
     }
   }, [open])
 
@@ -88,13 +98,13 @@ export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: D
         }}
         aria-hidden="true"
       />
-      <DialogContext.Provider value={{ titleId, descriptionId }}>
+      <DialogContext.Provider value={{ titleId, descriptionId, registerTitle: () => setHasTitle(true), registerDescription: () => setHasDescription(true) }}>
         <div
           ref={contentRef}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={titleId}
-          aria-describedby={descriptionId}
+          aria-labelledby={hasTitle ? titleId : undefined}
+          aria-describedby={hasDescription ? descriptionId : undefined}
           tabIndex={-1}
           className="relative z-50 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border bg-card p-6 text-card-foreground shadow-lg"
           onKeyDown={handleKeyDown}
@@ -116,6 +126,9 @@ export function DialogHeader({ className, children, ...props }: React.HTMLAttrib
 
 export function DialogTitle({ className, children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   const ctx = useContext(DialogContext)
+  useEffect(() => {
+    ctx?.registerTitle()
+  }, [ctx])
   return (
     <h2 id={ctx?.titleId} className={cn('text-lg font-semibold leading-none tracking-tight', className)} {...props}>
       {children}
@@ -125,6 +138,9 @@ export function DialogTitle({ className, children, ...props }: React.HTMLAttribu
 
 export function DialogDescription({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
   const ctx = useContext(DialogContext)
+  useEffect(() => {
+    ctx?.registerDescription()
+  }, [ctx])
   return (
     <p id={ctx?.descriptionId} className={cn('text-sm text-muted-foreground', className)} {...props}>
       {children}

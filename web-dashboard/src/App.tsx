@@ -15,7 +15,7 @@ import Profile from '@/pages/Profile'
 
 function App() {
   const queryClient = useQueryClient()
-  const { isAuthenticated, user, setUser } = useAuth()
+  const { isAuthenticated, setUser } = useAuth()
   const { data: meData } = useMe()
 
   useEffect(() => {
