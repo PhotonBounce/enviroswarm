@@ -245,8 +245,8 @@ async def rate_limit_dependency(
             try:
                 addr = ip_address(client_ip)
                 if addr.is_private or addr.is_loopback:
-                    # Use the last IP in the chain (closest to the app server)
-                    client_ip = forwarded.split(",")[-1].strip()
+                    # Use the first IP in the chain (original client IP)
+                    client_ip = forwarded.split(",")[0].strip()
             except ValueError:
                 pass
         identifier = f"ip:{client_ip}"

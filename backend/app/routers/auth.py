@@ -74,7 +74,7 @@ async def register(
         try:
             addr = ip_address(client_ip)
             if addr.is_private or addr.is_loopback:
-                client_ip = forwarded.split(",")[-1].strip()
+                client_ip = forwarded.split(",")[0].strip()
         except ValueError:
             pass
 
