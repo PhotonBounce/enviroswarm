@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/hooks/useAuth'
 import api, { type ApiResponse } from '@/lib/api'
 import type {
   User,
@@ -79,8 +80,9 @@ export function useUpdateUser() {
 
 // Stations
 export function useStations() {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['stations'],
+    queryKey: ['stations', user?.id],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorStation[]>>('/stations')
       if (!res.data?.success) {
@@ -92,8 +94,9 @@ export function useStations() {
 }
 
 export function useStation(id: string) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['stations', id],
+    queryKey: ['stations', id, user?.id],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorStation>>(`/stations/${id}`)
       if (!res.data?.success) {
@@ -107,6 +110,7 @@ export function useStation(id: string) {
 
 export function useCreateStation() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (data: CreateStationRequest) => {
       const res = await api.post<ApiResponse<SensorStation>>('/stations', data)
@@ -116,7 +120,7 @@ export function useCreateStation() {
       return res.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stations'] })
+      queryClient.invalidateQueries({ queryKey: ['stations', user?.id] })
     },
   })
 }
@@ -128,8 +132,9 @@ export interface SensorDataResult {
 }
 
 export function useSensorData(params: DataQueryParams) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['sensorData', params],
+    queryKey: ['sensorData', user?.id, params],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorReading[]>>('/data', {
         params,
@@ -143,8 +148,9 @@ export function useSensorData(params: DataQueryParams) {
 }
 
 export function useNearbyData(params: NearbyQueryParams) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['nearbyData', params],
+    queryKey: ['nearbyData', user?.id, params],
     queryFn: async () => {
       const res = await api.get<ApiResponse<SensorReading[]>>('/data/nearby', {
         params,
@@ -159,8 +165,9 @@ export function useNearbyData(params: NearbyQueryParams) {
 
 // API Keys
 export function useApiKeys() {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['apikeys'],
+    queryKey: ['apikeys', user?.id],
     queryFn: async () => {
       const res = await api.get<ApiResponse<ApiKey[]>>('/apikeys')
       if (!res.data?.success) {
@@ -173,6 +180,7 @@ export function useApiKeys() {
 
 export function useCreateApiKey() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (name: string) => {
       const res = await api.post<ApiResponse<ApiKeyCreateResponse>>('/apikeys', { name })
@@ -182,13 +190,14 @@ export function useCreateApiKey() {
       return res.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apikeys'] })
+      queryClient.invalidateQueries({ queryKey: ['apikeys', user?.id] })
     },
   })
 }
 
 export function useDeleteApiKey() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (id: string) => {
       const res = await api.delete<ApiResponse<unknown>>(`/apikeys/${id}`)
@@ -198,7 +207,7 @@ export function useDeleteApiKey() {
       return res.data.data
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['apikeys'] })
+      queryClient.invalidateQueries({ queryKey: ['apikeys', user?.id] })
     },
   })
 }
