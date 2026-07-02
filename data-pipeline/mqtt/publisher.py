@@ -23,7 +23,7 @@ def _on_publish(client, userdata, mid):
 
 
 def publish_readings(
-    readings: List[Dict[str, Any]],
+    readings: Optional[List[Dict[str, Any]]],
     broker_host: str = "localhost",
     broker_port: int = 1883,
     topic_prefix: str = "enviroswarm/sensors",
@@ -108,8 +108,11 @@ def publish_readings(
     finally:
         try:
             client.disconnect()
+        except Exception as e:
+            print(f"[MQTT] Warning: cleanup error during disconnect: {e}")
+        try:
             client.loop_stop()
         except Exception as e:
-            print(f"[MQTT] Warning: cleanup error during disconnect/loop_stop: {e}")
+            print(f"[MQTT] Warning: cleanup error during loop_stop: {e}")
     print(f"[MQTT] Published {published} messages.")
     return published
