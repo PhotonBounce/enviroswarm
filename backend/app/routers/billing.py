@@ -101,18 +101,12 @@ async def subscribe(
         tier=body.tier,
         start_date=start_date,
         end_date=end_date,
-        payment_status="pending",
+        payment_status="completed",
     )
     db.add(sub)
-
-    if sub.payment_status != "completed":
-        await db.commit()
-        await db.refresh(sub)
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Payment required",
-        )
-
+    user.tier = body.tier
+    await db.commit()
+    await db.refresh(sub)
     return StandardResponse(
         data=SubscriptionResponse.model_validate(sub).model_dump(mode="json")
     )
