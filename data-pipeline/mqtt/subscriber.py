@@ -11,6 +11,7 @@ import signal
 import sys
 import threading
 import time
+import datetime
 import hashlib
 from typing import Optional
 
@@ -29,6 +30,23 @@ DEFAULT_MAX_QUEUE_SIZE = _safe_int("MQTT_MAX_QUEUE_SIZE", 1000)
 DEFAULT_BATCH_SIZE = _safe_int("MQTT_BATCH_SIZE", 50)
 DEFAULT_INGEST_TIMEOUT = _safe_float("MQTT_INGEST_TIMEOUT", 10)
 DEFAULT_INGEST_RETRY = _safe_int("MQTT_INGEST_RETRY", 3)
+
+
+def _persist_dead_letter(batch: list, reason: str) -> None:
+    """Persist a failed batch to a dead-letter file for manual replay."""
+    if not batch:
+        return
+    try:
+        dl_dir = os.path.join(os.path.dirname(__file__), "..", "dead_letter")
+        os.makedirs(dl_dir, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        dl_path = os.path.join(dl_dir, f"dead_letter_{timestamp}_{reason}.jsonl")
+        with open(dl_path, "w", encoding="utf-8") as f:
+            for item in batch:
+                f.write(json.dumps(item) + "\n")
+        logger.error("[MQTT Sub] Persisted %s failed reading(s) to dead-letter: %s", len(batch), dl_path)
+    except Exception as e:
+        logger.error("[MQTT Sub] Failed to persist dead-letter batch: %s", e)
 
 
 def _on_connect(client, userdata, flags, rc):
@@ -145,52 +163,64 @@ def _start_worker(
                 except queue.Empty:
                     if batch:
                         try:
-                            _post_with_retry(
+                            ok = _post_with_retry(
                                 session, api_base, batch, auth_token, ingest_timeout, max_retries
                             )
+                            if not ok:
+                                _persist_dead_letter(batch, "api_retry_exhausted")
                         except Exception as e:
                             logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
+                            _persist_dead_letter(batch, "worker_exception")
                         finally:
                             for _ in batch:
                                 try:
                                     q.task_done()
-                                except Exception:
+                                except ValueError:
                                     logger.debug("task_done() failed")
                         batch = []
                     continue
 
                 if len(batch) >= batch_size:
                     try:
-                        _post_with_retry(
+                        ok = _post_with_retry(
                             session, api_base, batch, auth_token, ingest_timeout, max_retries
                         )
+                        if not ok:
+                            _persist_dead_letter(batch, "api_retry_exhausted")
                     except Exception as e:
                         logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
+                        _persist_dead_letter(batch, "worker_exception")
                     finally:
                         for _ in batch:
                             try:
                                 q.task_done()
-                            except Exception:
+                            except ValueError:
                                 logger.debug("task_done() failed")
                         batch = []
 
             # Flush remaining batch on shutdown
             if batch:
                 try:
-                    _post_with_retry(
+                    ok = _post_with_retry(
                         session, api_base, batch, auth_token, ingest_timeout, max_retries
                     )
+                    if not ok:
+                        _persist_dead_letter(batch, "api_retry_exhausted")
                 except Exception as e:
                     logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
+                    _persist_dead_letter(batch, "worker_exception")
                 finally:
                     for _ in batch:
                         try:
                             q.task_done()
-                        except Exception:
+                        except ValueError:
                             logger.debug("task_done() failed")
                     batch = []
-        except Exception as e:
+        except BaseException as e:
+            if batch:
+                _persist_dead_letter(batch, f"worker_crash_{type(e).__name__}")
             logger.error("[MQTT Sub] FATAL worker thread error, thread exiting: %s", e)
+            raise
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
@@ -216,50 +246,56 @@ def _on_message_factory(q: queue.Queue):
     """Build an on_message callback bound to the given queue."""
     def _on_message(client, userdata, msg):
         """Callback when a message arrives on a subscribed topic."""
+        def _ack_if_needed():
+            if getattr(client, "manual_ack", False):
+                try:
+                    client.ack(msg.mid)
+                except Exception as e:
+                    logger.warning("[MQTT Sub] Manual ack failed for mid %s: %s", msg.mid, e)
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
         except UnicodeDecodeError as e:
             logger.warning("[MQTT Sub] Invalid UTF-8 on %s: %s", msg.topic, e)
+            _ack_if_needed()
             return
         except json.JSONDecodeError as e:
             logger.warning("[MQTT Sub] Invalid JSON on %s: %s", msg.topic, e)
+            _ack_if_needed()
             return
-
         if not isinstance(payload, dict):
             logger.warning("[MQTT Sub] Invalid payload type on %s: expected dict, got %s", msg.topic, type(payload).__name__)
+            _ack_if_needed()
             return
-
         try:
             q.put_nowait(payload)
+            _ack_if_needed()
         except queue.Full:
             logger.warning("[MQTT Sub] Queue full (maxsize=%s), dropping message on %s", q.maxsize, msg.topic)
-
+            # Do not ack; broker will redeliver for QoS 1
     return _on_message
 
 
 def _drain_and_shutdown(q: queue.Queue, stop_event: threading.Event, thread_ref: dict, client, session: Optional[requests.Session] = None, timeout: float = 30.0) -> None:
     """Gracefully drain the queue and shut down the worker thread."""
-    print(f"[MQTT Sub] Draining queue ({q.qsize()} items remaining)...")
-    drain_start = time.monotonic()
-    while not q.empty() and time.monotonic() - drain_start < timeout:
-        time.sleep(0.05)
-    remaining = time.monotonic() - drain_start
+    logger.info("[MQTT Sub] Draining queue (%s items remaining)...", q.qsize())
     stop_event.set()
-    thread_ref["thread"].join(timeout=max(0.0, timeout - remaining))
+    thread_ref["thread"].join(timeout=timeout)
+    if thread_ref["thread"].is_alive():
+        logger.warning("[MQTT Sub] Worker thread did not exit within %ss timeout; in-flight batch may be lost.", timeout)
     try:
         client.disconnect()
     except Exception as e:
-        print(f"[MQTT Sub] Warning: cleanup error during disconnect: {e}")
+        logger.warning("[MQTT Sub] Cleanup error during disconnect: %s", e)
     try:
         client.loop_stop()
     except Exception as e:
-        print(f"[MQTT Sub] Warning: cleanup error during loop_stop: {e}")
+        logger.warning("[MQTT Sub] Cleanup error during loop_stop: %s", e)
     if session is not None:
         try:
             session.close()
         except Exception as e:
-            print(f"[MQTT Sub] Warning: cleanup error during session close: {e}")
-    print("[MQTT Sub] Shutdown complete.")
+            logger.warning("[MQTT Sub] Cleanup error during session close: %s", e)
+    logger.info("[MQTT Sub] Shutdown complete.")
 
 
 def start_subscriber(
@@ -318,6 +354,7 @@ def start_subscriber(
         client_id=client_id or f"enviroswarm-sub-{uuid.uuid4().hex[:8]}",
         clean_session=False,
     )
+    client.manual_ack = True
     client.user_data_set({"topic_prefix": topic_prefix})
     client.on_connect = _on_connect
     client.on_message = _on_message_factory(q)
@@ -325,7 +362,7 @@ def start_subscriber(
 
     # Graceful shutdown on SIGTERM (Docker)
     def _signal_handler(signum, frame):
-        print(f"[MQTT Sub] Received signal {signum}, shutting down gracefully...")
+        logger.info("[MQTT Sub] Received signal %s, shutting down gracefully...", signum)
         _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
         sys.exit(0)
 
@@ -334,41 +371,41 @@ def start_subscriber(
     try:
         client.connect(broker_host, broker_port, 60)
     except Exception as e:
-        print(f"[MQTT Sub] Could not connect to broker {broker_host}:{broker_port}: {e}")
+        logger.error("[MQTT Sub] Could not connect to broker %s:%s: %s", broker_host, broker_port, e)
         stop_event.set()
         try:
             session.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("[MQTT Sub] Session close failed during connect error handling: %s", e)
         return
 
     client.loop_start()
 
-    print(f"[MQTT Sub] Listening on {broker_host}:{broker_port} for {topic_prefix}")
-    print(f"[MQTT Sub] Forwarding to {api_base}/api/v1/ingest")
-    print(f"[MQTT Sub] Queue maxsize: {max_queue_size}")
+    logger.info("[MQTT Sub] Listening on %s:%s for %s", broker_host, broker_port, topic_prefix)
+    logger.info("[MQTT Sub] Forwarding to %s/api/v1/ingest", api_base)
+    logger.info("[MQTT Sub] Queue maxsize: %s", max_queue_size)
     if auth_token:
-        print("[MQTT Sub] Authenticated with provided token.")
+        logger.info("[MQTT Sub] Authenticated with provided token.")
     else:
-        print("[MQTT Sub] WARNING: No auth_token provided. API requests may fail with 401.")
+        logger.warning("[MQTT Sub] No auth_token provided. API requests may fail with 401.")
 
     if run_duration_seconds is not None:
         try:
             time.sleep(run_duration_seconds)
         except KeyboardInterrupt:
-            print("[MQTT Sub] Stopped by user during timed run, shutting down gracefully...")
+            logger.info("[MQTT Sub] Stopped by user during timed run, shutting down gracefully...")
             _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
-            print("[MQTT Sub] Stopped.")
+            logger.info("[MQTT Sub] Stopped.")
             return
         _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
-        print("[MQTT Sub] Stopped.")
+        logger.info("[MQTT Sub] Stopped.")
     else:
         # Keep running until interrupted
         try:
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
-            print("[MQTT Sub] Stopped by user, shutting down gracefully...")
+            logger.info("[MQTT Sub] Stopped by user, shutting down gracefully...")
             _drain_and_shutdown(q, stop_event, thread_ref, client, session=session, timeout=30.0)
 
 
