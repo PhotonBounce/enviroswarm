@@ -70,6 +70,7 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
             return True
 
         if entry.count >= limit:
+            await session.rollback()
             return False
 
         entry.count += 1
