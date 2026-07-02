@@ -65,7 +65,7 @@ async def ingest(
                 SensorStation.user_id == user.id,
                 SensorStation.status == "active",
                 SensorStation.deleted_at.is_(None),
-            )
+            ).with_for_update()
         )
         stations = result.scalars().all()
         station_sensor_types = {s.id: s.sensor_types for s in stations}
