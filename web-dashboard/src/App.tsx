@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
@@ -16,7 +16,14 @@ import Profile from '@/pages/Profile'
 function App() {
   const queryClient = useQueryClient()
   const { isAuthenticated, setUser } = useAuth()
-  const { data: meData } = useMe()
+  const { data: meData, isLoading: meLoading } = useMe()
+  const [authReady, setAuthReady] = useState(false)
+
+  useEffect(() => {
+    if (!meLoading) {
+      setAuthReady(true)
+    }
+  }, [meLoading])
 
   useEffect(() => {
     if (meData) {
@@ -33,6 +40,14 @@ function App() {
     window.addEventListener('enviroswarm:unauthorized', handler)
     return () => window.removeEventListener('enviroswarm:unauthorized', handler)
   }, [queryClient])
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-400" />
+      </div>
+    )
+  }
 
   return (
     <Routes>
