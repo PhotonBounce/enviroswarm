@@ -9,9 +9,11 @@ Usage:
 """
 
 import argparse
+import getpass
 import gzip
 import hashlib
 import json
+import logging
 import os
 import sys
 import time
@@ -484,13 +486,13 @@ def run_seed(
                         # so we avoid sending readings for non-existent stations.
 
         # ------------------------------------------------------------------
-        # 3. Generate Readings
+        # 3. Generate & Ingest Readings
         # ------------------------------------------------------------------
         print(f"\n[5/7] Generating {days} days of historical readings...")
         print(f"       Interval: {INTERVAL_MINUTES} minutes | Missing: {MISSING_RATE*100:.0f}% | Outliers: {OUTLIER_RATE*100:.0f}%")
 
         end_time = datetime.now(timezone.utc).replace(microsecond=0)
-        readings = generate_all_readings(
+        readings_gen = generate_all_readings(
             stations=created_stations,
             days=days,
             interval_minutes=INTERVAL_MINUTES,
@@ -498,44 +500,73 @@ def run_seed(
             outlier_rate=OUTLIER_RATE,
             end_time=end_time,
         )
-        summary["readings_generated"] = len(readings)
-        print(f"  Generated {len(readings):,} readings.")
 
         # ------------------------------------------------------------------
         # 4. Ingest in Batches
         # ------------------------------------------------------------------
         if not dry_run:
             print(f"\n[6/7] Submitting readings in batches of {batch_size}...")
-            total_batches = (len(readings) + batch_size - 1) // batch_size
-            adaptive_delay = batch_delay
-            for i in range(0, len(readings), batch_size):
-                batch = readings[i : i + batch_size]
-                batch_num = (i // batch_size) + 1
+        else:
+            print(f"\n[6/7] DRY RUN: skipping ingest...")
+
+        batch = []
+        batch_num = 0
+        adaptive_delay = batch_delay
+        total_readings = 0
+        sensor_counts = {}
+
+        for reading in readings_gen:
+            total_readings += 1
+            st = reading["sensor_type"]
+            sensor_counts[st] = sensor_counts.get(st, 0) + 1
+            batch.append(reading)
+
+            if len(batch) >= batch_size:
+                batch_num += 1
+                if not dry_run:
+                    batch_start = time.monotonic()
+                    try:
+                        result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
+                        summary["batches_sent"] += 1
+                        inserted = result.get("inserted", "?")
+                        print(f"  Batch {batch_num} ({len(batch)} readings) -> inserted={inserted}")
+                    except (requests.RequestException, RuntimeError) as e:
+                        summary["api_errors"] += 1
+                        sample = json.dumps({"readings": batch[:2]})[:500]
+                        print(f"  Batch {batch_num} -> ERROR: {e} | body sample: {sample}")
+
+                    elapsed_req = time.monotonic() - batch_start
+                    if elapsed_req > 2.0:
+                        adaptive_delay = min(adaptive_delay * 1.5, 5.0)
+                    elif elapsed_req < 0.5 and adaptive_delay > batch_delay:
+                        adaptive_delay = max(adaptive_delay * 0.9, batch_delay)
+
+                    if adaptive_delay > 0:
+                        time.sleep(adaptive_delay)
+                else:
+                    print(f"  DRY RUN: Batch {batch_num} ({len(batch)} readings)")
+                batch = []
+
+        # Flush remaining batch
+        if batch:
+            batch_num += 1
+            if not dry_run:
                 batch_start = time.monotonic()
                 try:
                     result = ingest_bulk(session, token, batch, effective_api_base, ingest_timeout=ingest_timeout)
                     summary["batches_sent"] += 1
                     inserted = result.get("inserted", "?")
-                    print(f"  Batch {batch_num}/{total_batches} ({len(batch)} readings) -> inserted={inserted}")
+                    print(f"  Batch {batch_num} ({len(batch)} readings) -> inserted={inserted}")
                 except (requests.RequestException, RuntimeError) as e:
                     summary["api_errors"] += 1
                     sample = json.dumps({"readings": batch[:2]})[:500]
-                    print(f"  Batch {batch_num}/{total_batches} -> ERROR: {e} | body sample: {sample}")
+                    print(f"  Batch {batch_num} -> ERROR: {e} | body sample: {sample}")
+            else:
+                print(f"  DRY RUN: Batch {batch_num} ({len(batch)} readings)")
+            batch = []
 
-                # Adaptive rate-limiting: if request took > 2s, increase delay;
-                # if request was fast, slowly decrease toward base delay.
-                elapsed_req = time.monotonic() - batch_start
-                if elapsed_req > 2.0:
-                    adaptive_delay = min(adaptive_delay * 1.5, 5.0)
-                elif elapsed_req < 0.5 and adaptive_delay > batch_delay:
-                    adaptive_delay = max(adaptive_delay * 0.9, batch_delay)
-
-                # Skip sleep after the final batch
-                if batch_num < total_batches and adaptive_delay > 0:
-                    time.sleep(adaptive_delay)
-        else:
-            total_batches = (len(readings) + batch_size - 1) // batch_size
-            print(f"\n[6/7] DRY RUN: skipping ingest. Would send {len(readings):,} readings in {total_batches} batches.")
+        summary["readings_generated"] = total_readings
+        print(f"  Generated {total_readings:,} readings.")
 
         # ------------------------------------------------------------------
         # 5. Summary Stats
@@ -555,10 +586,6 @@ def run_seed(
         print(f"  Elapsed:       {summary['elapsed_seconds']:.2f}s")
 
         # Per-sensor breakdown
-        sensor_counts = {}
-        for r in readings:
-            st = r["sensor_type"]
-            sensor_counts[st] = sensor_counts.get(st, 0) + 1
         print("\n  Readings per sensor type:")
         for st in sorted(sensor_counts.keys()):
             print(f"    {st:<15} {sensor_counts[st]:>8,}")
@@ -647,12 +674,6 @@ def main():
         help=f"Demo user email (default: {DEMO_EMAIL})",
     )
     parser.add_argument(
-        "--password",
-        type=str,
-        default=DEMO_PASSWORD,
-        help="Demo user password (default: ***hidden*** or DEMO_PASSWORD env var)",
-    )
-    parser.add_argument(
         "--tier",
         type=str,
         default=DEMO_TIER,
@@ -671,8 +692,11 @@ def main():
     )
     args = parser.parse_args()
 
-    if not args.password:
-        raise ValueError("DEMO_PASSWORD environment variable is required (or use --password)")
+    password = os.environ.get("DEMO_PASSWORD")
+    if not password:
+        password = getpass.getpass("DEMO_PASSWORD environment variable not set. Enter password: ")
+    if not password:
+        raise ValueError("DEMO_PASSWORD environment variable is required")
     if args.duration_months < 1:
         raise ValueError("duration_months must be >= 1")
     if args.stations <= 0:
@@ -700,7 +724,7 @@ def main():
         ingest_timeout=args.ingest_timeout,
         wait_for_backend=args.wait_for_backend,
         email=args.email,
-        password=args.password,
+        password=password,
         tier=args.tier,
         duration_months=args.duration_months,
     )
