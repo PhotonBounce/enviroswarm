@@ -44,7 +44,7 @@ def _random_offset(latitude: float, longitude: float, radius_km: float) -> tuple
     Approximate: 1 deg lat ≈ 111 km, 1 deg lon ≈ 111 km * cos(lat).
     """
     r = radius_km * random.random() ** 0.5  # uniform distribution in circle
-    theta = random.uniform(0, 2 * 3.141592653589793)
+    theta = random.uniform(0, math.tau)
     lat_offset = (r * math.sin(theta)) / 111.0
     lon_offset = (r * math.cos(theta)) / (111.32 * math.cos(math.radians(latitude)))
     return latitude + lat_offset, longitude + lon_offset

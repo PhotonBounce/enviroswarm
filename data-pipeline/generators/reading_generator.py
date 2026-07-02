@@ -4,15 +4,16 @@ import random
 import math
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
+from zoneinfo import ZoneInfo
 
 
-# City-specific UTC offsets (standard time, approximate)
-_CITY_OFFSETS = {
-    "New York City": -5,
-    "Los Angeles": -8,
-    "London": 0,
-    "Tokyo": 9,
-    "Berlin": 1,
+# City-specific IANA timezones for accurate DST handling
+_CITY_TIMEZONES = {
+    "New York City": "America/New_York",
+    "Los Angeles": "America/Los_Angeles",
+    "London": "Europe/London",
+    "Tokyo": "Asia/Tokyo",
+    "Berlin": "Europe/Berlin",
 }
 
 
@@ -33,8 +34,9 @@ _OUTLIER_OFFSETS = {
 
 def _local_hour(timestamp: datetime, city: str) -> int:
     """Convert UTC timestamp to local solar hour for the given city."""
-    offset = _CITY_OFFSETS.get(city, 0)
-    local_ts = timestamp + timedelta(hours=offset)
+    tz_name = _CITY_TIMEZONES.get(city, "UTC")
+    tz = ZoneInfo(tz_name)
+    local_ts = timestamp.astimezone(tz)
     return local_ts.hour
 
 
@@ -48,7 +50,6 @@ def _daily_seasonal_factor(hour: int, base_phase: float = 0.0) -> float:
 def _temperature_value(
     timestamp: datetime,
     city: str,
-    base_temp: Optional[float] = None,
 ) -> float:
     """Generate a realistic temperature value in °C."""
     # City-specific base temperature (approximate seasonal average)
@@ -59,7 +60,7 @@ def _temperature_value(
         "Tokyo": 16.0,
         "Berlin": 10.0,
     }
-    base = base_temp if base_temp is not None else city_bases.get(city, 15.0)
+    base = city_bases.get(city, 15.0)
     
     hour = _local_hour(timestamp, city)
     day_of_year = timestamp.utctimetuple().tm_yday
@@ -283,8 +284,22 @@ def generate_readings_for_station(
                     value = max(0.0, value)
                     if st == "humidity":
                         value = min(100.0, value)
+                    elif st == "co2":
+                        value = min(600.0, value)
+                    elif st == "pm25":
+                        value = min(150.0, value)
+                    elif st == "pm10":
+                        value = min(200.0, value)
+                    elif st == "noise_level":
+                        value = min(100.0, value)
+                    elif st == "radiation":
+                        value = min(0.30, value)
+                    elif st == "air_quality":
+                        value = min(200.0, value)
                     elif st == "water_quality":
                         value = min(100.0, value)
+                    elif st == "voc":
+                        value = min(1000.0, value)
                 elif st == "temperature":
                     value = max(-80.0, value)
                     value = min(90.0, value)
