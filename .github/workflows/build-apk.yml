@@ -36,7 +36,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Expo CLI
+      - name: Install SDK components
+        run: |
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Expo prebuild
         working-directory: ./android-app
         run: npx expo prebuild --platform android --no-install
 
