@@ -36,7 +36,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 settings = get_settings()
 
-_DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt(rounds=4)).decode("utf-8")
+_DUMMY_HASH = hash_password("dummy")
 
 
 # Cookie settings for web clients
