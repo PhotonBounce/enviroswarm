@@ -3,7 +3,7 @@
 import random
 import math
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 from zoneinfo import ZoneInfo
 
 
@@ -331,11 +331,10 @@ def generate_all_readings(
     missing_rate: float = 0.03,
     outlier_rate: float = 0.01,
     end_time: Optional[datetime] = None,
-) -> List[Dict[str, Any]]:
-    """Generate readings for all stations."""
-    all_readings = []
+) -> Iterator[Dict[str, Any]]:
+    """Generate readings for all stations incrementally."""
     for station in stations:
-        readings = generate_readings_for_station(
+        yield from generate_readings_for_station(
             station,
             days=days,
             interval_minutes=interval_minutes,
@@ -343,5 +342,3 @@ def generate_all_readings(
             outlier_rate=outlier_rate,
             end_time=end_time,
         )
-        all_readings.extend(readings)
-    return all_readings
