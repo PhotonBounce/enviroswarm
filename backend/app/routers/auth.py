@@ -30,7 +30,7 @@ from app.schemas import (
     UserResponse,
 )
 from app.config import get_settings
-from app.dependencies import check_rate_limit
+from app.dependencies import check_rate_limit, rate_limit_dependency
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
