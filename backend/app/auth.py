@@ -140,14 +140,15 @@ from app.database import get_sessionmaker
 from app.models import RevokedToken
 
 
-async def revoke_refresh_token(jti: str, expires_at: datetime) -> None:
+async def revoke_refresh_token(jti: str, expires_at: datetime) -> bool:
     async with (await get_sessionmaker())() as session:
         try:
             session.add(RevokedToken(jti=jti, revoked_at=datetime.now(timezone.utc), expires_at=expires_at))
             await session.commit()
+            return True
         except IntegrityError:
             await session.rollback()
-            # Already revoked — race condition handled gracefully
+            return False
 
 
 async def is_refresh_token_revoked(jti: str) -> bool:

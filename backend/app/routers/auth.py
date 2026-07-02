@@ -219,16 +219,20 @@ async def refresh_token(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive"
         )
 
-    new_access = create_access_token(str(user.id))
-    new_refresh = create_refresh_token(str(user.id))
-
-    # Revoke old refresh token
+    # Revoke old refresh token BEFORE creating new tokens
     old_jti = payload.get("jti")
     old_exp = payload.get("exp")
     if old_jti and old_exp:
         from datetime import datetime, timezone
         expires_at = datetime.fromtimestamp(old_exp, tz=timezone.utc)
-        await revoke_refresh_token(old_jti, expires_at)
+        if not await revoke_refresh_token(old_jti, expires_at):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token has been revoked",
+            )
+
+    new_access = create_access_token(str(user.id))
+    new_refresh = create_refresh_token(str(user.id))
 
     # Update cookies
     response.set_cookie(value=new_access, **COOKIE_SETTINGS)
