@@ -1,5 +1,6 @@
 """Billing / subscription router."""
 
+import re
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from uuid import UUID
@@ -57,10 +58,9 @@ async def get_pricing() -> StandardResponse:
 
 
 def _verify_payment_intent(payment_intent_id: str) -> bool:
-    """Placeholder for payment gateway verification (e.g., Stripe)."""
-    if not payment_intent_id or not payment_intent_id.startswith("pi_"):
+    if not payment_intent_id:
         return False
-    return True
+    return bool(re.fullmatch(r"pi_[A-Za-z0-9]{24,}", payment_intent_id))
 
 
 @router.post("/subscribe", response_model=StandardResponse)
@@ -83,7 +83,12 @@ async def subscribe(
         )
 
     # Lock user row to prevent race condition on duplicate active subscriptions.
-    await db.execute(select(User).where(User.id == user.id).with_for_update())
+    result = await db.execute(select(User).where(User.id == user.id).with_for_update())
+    locked_user = result.scalar_one_or_none()
+    if not locked_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     # Check for existing active subscription
     now = datetime.now(timezone.utc)
@@ -119,7 +124,7 @@ async def subscribe(
         payment_intent_id=body.payment_intent_id,
     )
     db.add(sub)
-    user.tier = body.tier
+    locked_user.tier = body.tier
     await db.commit()
     await db.refresh(sub)
     return StandardResponse(
