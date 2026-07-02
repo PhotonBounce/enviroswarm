@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'android-app/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
 jobs:
@@ -28,31 +29,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
 
       - name: Build APK with EAS
         run: eas build --platform android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Download APK artifact
         run: |
-          # EAS Build outputs a URL to the artifact
-          BUILD_URL=$(eas build:list --platform android --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
-          curl -L "$BUILD_URL" -o enviroswarm.apk
+          BUILD_URL=$(eas build:list --platform android --limit 1 --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
+          echo "Build URL: $BUILD_URL"
+          curl -L "$BUILD_URL" -o ../enviroswarm.apk
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Upload APK to GitHub Releases
         uses: softprops/action-gh-release@v1
-        if: github.ref == 'refs/heads/main'
         with:
-          tag_name: apk-${{ github.run_number }}
-          name: ENViroSwarm APK Build ${{ github.run_number }}
-          files: ./android-app/enviroswarm.apk
+          tag_name: apk-v${{ github.run_number }}
+          name: ENViroSwarm APK v${{ github.run_number }}
+          files: ./enviroswarm.apk
           body: |
             Automated APK build from commit ${{ github.sha }}.
             Download and install on Android devices.
@@ -61,10 +59,11 @@ jobs:
 
       - name: Upload APK to FTP
         run: |
-          curl -T ./android-app/enviroswarm.apk \
-            ftp://${{ secrets.FTP_HOST }}/public_html/enviroswarm/apk/enviroswarm.apk \
-            --user "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}"
-        if: env.FTP_HOST != ''
+          if [ -n "$FTP_HOST" ]; then
+            curl -T ../enviroswarm.apk \
+              ftp://$FTP_HOST/public_html/enviroswarm/apk/enviroswarm.apk \
+              --user "$FTP_USER:$FTP_PASS"
+          fi
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
