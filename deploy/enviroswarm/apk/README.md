@@ -1,0 +1,1 @@
+# ENViroSwarm Android APK\n\nThe Android APK will be available here once built via Expo EAS.\n\nTo build locally:\n1. cd android-app\n2. npm install\n3. npx expo prebuild --platform android\n4. cd android && ./gradlew assembleRelease\n

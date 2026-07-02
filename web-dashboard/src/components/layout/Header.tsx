@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, Bell, User, X } from 'lucide-react'
+import { Menu, Bell, User, X, Smartphone } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
@@ -89,6 +89,16 @@ export default function Header() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <a
+            href="/apk/enviroswarm.apk"
+            download
+            className="hidden sm:flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+            aria-label="Download Android APK"
+            title="Download Android App"
+          >
+            <Smartphone className="h-3.5 w-3.5" />
+            <span>Get APK</span>
+          </a>
           <div className="relative" ref={notificationRef}>
             <button
               className="relative rounded-lg p-2 hover:bg-muted"
