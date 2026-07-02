@@ -22,7 +22,6 @@ function App() {
     if (meData) {
       setUser(meData)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meData, setUser])
 
   // Clear the ['me'] query cache when the user is logged out to prevent

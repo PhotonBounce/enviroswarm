@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api, { type ApiResponse } from '@/lib/api'
-import { useAuth } from '@/hooks/useAuth'
 import type {
   User,
   SensorStation,
@@ -42,7 +41,6 @@ export function useRegister() {
 }
 
 export function useMe() {
-  const { isAuthenticated } = useAuth()
   return useQuery({
     queryKey: ['me'],
     queryFn: async () => {
@@ -52,7 +50,6 @@ export function useMe() {
       }
       return res.data.data
     },
-    enabled: isAuthenticated,
   })
 }
 
