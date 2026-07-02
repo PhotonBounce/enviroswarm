@@ -305,7 +305,13 @@ def start_subscriber(
     session.headers.update({"User-Agent": "enviroswarm-subscriber/1.0"})
 
     q, stop_event, thread_ref = _start_worker(
-        session, api_base, auth_token, max_queue_size, ingest_timeout, max_retries
+        session,
+        api_base,
+        auth_token,
+        max_queue_size=max_queue_size,
+        batch_size=DEFAULT_BATCH_SIZE,
+        ingest_timeout=ingest_timeout,
+        max_retries=max_retries,
     )
 
     client = mqtt.Client(
