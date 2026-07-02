@@ -181,13 +181,19 @@ async def get_current_user_or_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired API key"
         )
 
-    # Fall back to JWT
+    # Fall back to JWT (Authorization header or httpOnly cookie)
+    token = None
     auth = request.headers.get("Authorization", "")
-    if not auth or not auth.lower().startswith("bearer "):
+    if auth and auth.lower().startswith("bearer "):
+        token = auth[7:].strip()
+    if not token:
+        cookie_token = request.cookies.get("access_token")
+        if cookie_token:
+            token = cookie_token
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authentication"
         )
-    token = auth[7:].strip()
     payload = await decode_access_token(token)
     user_id = payload.get("sub")
     try:
