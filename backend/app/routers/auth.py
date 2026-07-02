@@ -276,10 +276,6 @@ async def logout(
         access_token = request.cookies.get("access_token")
     if access_token:
         token_found = True
-        try:
-            await decode_access_token(access_token)
-        except HTTPException:
-            pass
 
     # Fallback to refresh token from cookie or body
     refresh_token = request.cookies.get("refresh_token") or (body.refresh_token if body else None)
