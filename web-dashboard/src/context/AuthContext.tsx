@@ -1,4 +1,5 @@
 import React, { createContext, useState, useCallback, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { User, UserTier } from '@/types'
 import api from '@/lib/api'
 
@@ -23,6 +24,7 @@ export const AuthContext = createContext<AuthContextType>({
 })
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const queryClient = useQueryClient()
   const [user, setUserState] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -47,8 +49,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore errors — cookie will expire naturally
     }
+    queryClient.clear()
     setUserState(null)
-  }, [])
+  }, [queryClient])
 
   const setUser = useCallback((newUser: User) => {
     setUserState(newUser)
