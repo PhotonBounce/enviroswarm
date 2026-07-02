@@ -4,6 +4,7 @@ import uuid
 import argparse
 import gzip
 import json
+import logging
 import os
 import queue
 import signal
@@ -22,40 +23,41 @@ import requests
 
 from utils import _safe_int, _safe_float
 
-
+logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_QUEUE_SIZE = _safe_int("MQTT_MAX_QUEUE_SIZE", 1000)
+DEFAULT_BATCH_SIZE = _safe_int("MQTT_BATCH_SIZE", 50)
 DEFAULT_INGEST_TIMEOUT = _safe_float("MQTT_INGEST_TIMEOUT", 10)
 DEFAULT_INGEST_RETRY = _safe_int("MQTT_INGEST_RETRY", 3)
 
 
 def _on_connect(client, userdata, flags, rc):
     if rc == 0:
-        print("[MQTT Sub] Connected. Subscribing...")
+        logger.info("[MQTT Sub] Connected. Subscribing...")
         client.subscribe(userdata.get("topic_prefix", "enviroswarm/sensors/#"), qos=1)
     else:
-        print(f"[MQTT Sub] Connection failed with code {rc}")
+        logger.error("[MQTT Sub] Connection failed with code %s", rc)
 
 
 def _on_disconnect(client, userdata, rc):
-    print(f"[MQTT Sub] Disconnected with code {rc}")
+    logger.info("[MQTT Sub] Disconnected with code %s", rc)
 
 
 def _post_with_retry(
     session: requests.Session,
     api_base: str,
-    payload: dict,
+    payloads: list,
     auth_token: Optional[str],
     ingest_timeout: float,
     max_retries: int,
 ) -> bool:
-    """POST payload to ingest API with retry, gzip, and 413 handling."""
+    """POST a batch of payloads to ingest API with retry, gzip, and 413 handling."""
     api_url = api_base.rstrip('/') + '/api/v1/ingest'
     headers = {}
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
-    body = {"readings": [payload]}
+    body = {"readings": payloads}
     raw_json = json.dumps(body, sort_keys=True).encode("utf-8")
     if len(raw_json) > 1024:
         compressed = gzip.compress(raw_json)
@@ -75,40 +77,44 @@ def _post_with_retry(
                 timeout=ingest_timeout,
             )
             if resp.status_code == 413:
-                # Single message too large — can't split further, drop and log
-                print(f"[MQTT Sub] 413 Payload Too Large (attempt {attempt + 1}), dropping message")
+                if len(payloads) > 1:
+                    mid = len(payloads) // 2
+                    first_ok = _post_with_retry(session, api_base, payloads[:mid], auth_token, ingest_timeout, max_retries)
+                    second_ok = _post_with_retry(session, api_base, payloads[mid:], auth_token, ingest_timeout, max_retries)
+                    return first_ok and second_ok
+                logger.warning("[MQTT Sub] 413 Payload Too Large (single message), dropping")
                 return False
             if resp.status_code < 400:
                 try:
                     body_json = resp.json()
                     if body_json.get("success"):
-                        print("[MQTT Sub] Forwarded -> API OK")
+                        logger.info("[MQTT Sub] Forwarded %s reading(s) -> API OK", len(payloads))
                         return True
                     else:
-                        print(f"[MQTT Sub] API success=False: {body_json.get('error', 'unknown')}")
+                        logger.error("[MQTT Sub] API success=False: %s", body_json.get("error", "unknown"))
                         return False
                 except json.JSONDecodeError:
-                    print("[MQTT Sub] Forwarded -> API OK (non-JSON response)")
+                    logger.info("[MQTT Sub] Forwarded %s reading(s) -> API OK (non-JSON response)", len(payloads))
                     return True
             elif resp.status_code in (408, 429, 500, 502, 503, 504):
                 if attempt < max_retries:
                     wait = min(2 ** attempt, 8)
-                    print(f"[MQTT Sub] API error {resp.status_code}, retrying in {wait}s...")
+                    logger.warning("[MQTT Sub] API error %s, retrying in %ss...", resp.status_code, wait)
                     time.sleep(wait)
                     continue
                 else:
-                    print(f"[MQTT Sub] API error {resp.status_code}: {resp.text[:200]}")
+                    logger.error("[MQTT Sub] API error %s: %s", resp.status_code, resp.text[:200])
                     return False
             else:
-                print(f"[MQTT Sub] API error {resp.status_code}: {resp.text[:200]}")
+                logger.error("[MQTT Sub] API error %s: %s", resp.status_code, resp.text[:200])
                 return False
         except (requests.ConnectionError, requests.Timeout) as e:
             if attempt < max_retries:
                 wait = min(2 ** attempt, 8)
-                print(f"[MQTT Sub] API request failed (attempt {attempt + 1}), retrying in {wait}s: {e}")
+                logger.warning("[MQTT Sub] API request failed (attempt %s), retrying in %ss: %s", attempt + 1, wait, e)
                 time.sleep(wait)
             else:
-                print(f"[MQTT Sub] API request failed after {max_retries + 1} attempts: {e}")
+                logger.error("[MQTT Sub] API request failed after %s attempts: %s", max_retries + 1, e)
                 return False
         except requests.RequestException:
             raise
@@ -120,35 +126,71 @@ def _start_worker(
     api_base: str,
     auth_token: Optional[str],
     max_queue_size: int = DEFAULT_MAX_QUEUE_SIZE,
+    batch_size: int = DEFAULT_BATCH_SIZE,
     ingest_timeout: float = DEFAULT_INGEST_TIMEOUT,
     max_retries: int = DEFAULT_INGEST_RETRY,
 ) -> tuple[queue.Queue, threading.Event, dict]:
-    """Start a background worker thread that drains a queue and POSTs to the API."""
+    """Start a background worker thread that drains a queue and POSTs to the API in batches."""
     q: queue.Queue = queue.Queue(maxsize=max_queue_size)
     stop_event = threading.Event()
 
     def worker():
         """Worker thread loop with resilience against unhandled exceptions."""
+        batch = []
         try:
             while not stop_event.is_set():
                 try:
-                    payload = q.get(timeout=0.5)
+                    payload = q.get(timeout=0.1)
+                    batch.append(payload)
                 except queue.Empty:
+                    if batch:
+                        try:
+                            _post_with_retry(
+                                session, api_base, batch, auth_token, ingest_timeout, max_retries
+                            )
+                        except Exception as e:
+                            logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
+                        finally:
+                            for _ in batch:
+                                try:
+                                    q.task_done()
+                                except Exception:
+                                    logger.debug("task_done() failed")
+                        batch = []
                     continue
 
+                if len(batch) >= batch_size:
+                    try:
+                        _post_with_retry(
+                            session, api_base, batch, auth_token, ingest_timeout, max_retries
+                        )
+                    except Exception as e:
+                        logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
+                    finally:
+                        for _ in batch:
+                            try:
+                                q.task_done()
+                            except Exception:
+                                logger.debug("task_done() failed")
+                        batch = []
+
+            # Flush remaining batch on shutdown
+            if batch:
                 try:
                     _post_with_retry(
-                        session, api_base, payload, auth_token, ingest_timeout, max_retries
+                        session, api_base, batch, auth_token, ingest_timeout, max_retries
                     )
                 except Exception as e:
-                    print(f"[MQTT Sub] Unhandled worker error during POST: {e}")
+                    logger.error("[MQTT Sub] Unhandled worker error during POST: %s", e)
                 finally:
-                    try:
-                        q.task_done()
-                    except Exception:
-                        pass
+                    for _ in batch:
+                        try:
+                            q.task_done()
+                        except Exception:
+                            logger.debug("task_done() failed")
+                    batch = []
         except Exception as e:
-            print(f"[MQTT Sub] FATAL worker thread error, thread exiting: {e}")
+            logger.error("[MQTT Sub] FATAL worker thread error, thread exiting: %s", e)
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
@@ -160,7 +202,7 @@ def _start_worker(
         while not stop_event.is_set():
             thread_ref["thread"].join(timeout=1.0)
             if not stop_event.is_set() and not thread_ref["thread"].is_alive():
-                print("[MQTT Sub] Worker thread died, respawning...")
+                logger.warning("[MQTT Sub] Worker thread died, respawning...")
                 thread_ref["thread"] = threading.Thread(target=worker, daemon=True)
                 thread_ref["thread"].start()
             time.sleep(1.0)
@@ -177,20 +219,20 @@ def _on_message_factory(q: queue.Queue):
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
         except UnicodeDecodeError as e:
-            print(f"[MQTT Sub] Invalid UTF-8 on {msg.topic}: {e}")
+            logger.warning("[MQTT Sub] Invalid UTF-8 on %s: %s", msg.topic, e)
             return
         except json.JSONDecodeError as e:
-            print(f"[MQTT Sub] Invalid JSON on {msg.topic}: {e}")
+            logger.warning("[MQTT Sub] Invalid JSON on %s: %s", msg.topic, e)
             return
 
         if not isinstance(payload, dict):
-            print(f"[MQTT Sub] Invalid payload type on {msg.topic}: expected dict, got {type(payload).__name__}")
+            logger.warning("[MQTT Sub] Invalid payload type on %s: expected dict, got %s", msg.topic, type(payload).__name__)
             return
 
         try:
             q.put_nowait(payload)
         except queue.Full:
-            print(f"[MQTT Sub] Queue full (maxsize={q.maxsize}), dropping message on {msg.topic}")
+            logger.warning("[MQTT Sub] Queue full (maxsize=%s), dropping message on %s", q.maxsize, msg.topic)
 
     return _on_message
 
@@ -353,11 +395,6 @@ def main():
         help="MQTT client ID",
     )
     parser.add_argument(
-        "--auth-token",
-        default=os.getenv("AUTH_TOKEN", None),
-        help="JWT/API token for ingest endpoint",
-    )
-    parser.add_argument(
         "--max-queue-size",
         type=int,
         default=DEFAULT_MAX_QUEUE_SIZE,
@@ -383,6 +420,8 @@ def main():
     )
     args = parser.parse_args()
 
+    auth_token = os.environ.get("AUTH_TOKEN")
+
     if args.broker_port <= 0:
         raise ValueError("broker_port must be > 0")
     if args.max_queue_size <= 0:
@@ -400,7 +439,7 @@ def main():
         api_base=args.api_base,
         topic_prefix=args.topic_prefix,
         client_id=args.client_id,
-        auth_token=args.auth_token,
+        auth_token=auth_token,
         max_queue_size=args.max_queue_size,
         ingest_timeout=args.ingest_timeout,
         max_retries=args.max_retries,
