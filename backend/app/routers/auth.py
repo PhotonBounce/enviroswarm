@@ -127,12 +127,31 @@ async def register(
 
 @router.post("/login", response_model=StandardResponse)
 async def login(
+    request: Request,
     body: UserLoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
     # Normalize email for case-insensitive lookup
     body.email = body.email.lower().strip()
+
+    # IP-based rate limiting to prevent credential stuffing
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        from ipaddress import ip_address
+        try:
+            addr = ip_address(client_ip)
+            if addr.is_private or addr.is_loopback:
+                client_ip = forwarded.split(",")[0].strip()
+        except ValueError:
+            pass
+
+    if not await check_rate_limit(f"login:ip:{client_ip}", "/auth/login", 20):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts from this IP.",
+        )
 
     # Basic brute-force protection: limit login attempts per email
     login_key = f"login:{body.email}"
