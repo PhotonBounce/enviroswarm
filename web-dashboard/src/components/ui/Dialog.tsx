@@ -69,7 +69,7 @@ export function Dialog({ open, onOpenChange, children, onPointerDownOutside }: D
           content.querySelectorAll<HTMLElement>(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
           )
-        ).filter((el) => !el.disabled && el.offsetParent !== null)
+        ).filter((el) => !(el as HTMLButtonElement | HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).disabled && el.offsetParent !== null)
         if (focusableElements.length === 0) return
         const first = focusableElements[0]
         const last = focusableElements[focusableElements.length - 1]

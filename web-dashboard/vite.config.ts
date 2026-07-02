@@ -7,8 +7,8 @@ export default defineConfig({
     port: 5173,
   },
   resolve: {
-    alias: [
-      { find: '@', replacement: './src' },
-    ],
+    alias: {
+      '@': new URL('./src', import.meta.url).pathname,
+    },
   },
 })

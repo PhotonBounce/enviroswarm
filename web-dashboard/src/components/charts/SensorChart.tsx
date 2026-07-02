@@ -172,7 +172,7 @@ export default function SensorChart({ data, type = 'area', showLegend = true }: 
             <tr key={i}>
               <td>{row.timestamp}</td>
               {types.map((t) => (
-                <td key={t}>{(row as Record<string, number | undefined>)[t] ?? 'N/A'}</td>
+                <td key={t}>{(row as Record<string, string | number | undefined>)[t] ?? 'N/A'}</td>
               ))}
             </tr>
           ))}
