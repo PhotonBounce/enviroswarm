@@ -36,7 +36,7 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
     now = datetime.now(timezone.utc)
     window = timedelta(minutes=1)
 
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         result = await session.execute(
             select(RateLimitEntry).where(RateLimitEntry.key == key).with_for_update()
         )
@@ -79,7 +79,7 @@ async def check_rate_limit(identifier: str, route: str, limit: int) -> bool:
 
 async def cleanup_rate_limit_entries() -> None:
     """Delete expired rate limit entries."""
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         from sqlalchemy import delete
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=1)
         await session.execute(
@@ -90,7 +90,7 @@ async def cleanup_rate_limit_entries() -> None:
 
 async def cleanup_idempotency_keys() -> None:
     """Delete expired idempotency keys."""
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         from sqlalchemy import delete
         await session.execute(
             delete(IdempotencyKey).where(IdempotencyKey.expires_at < datetime.now(timezone.utc))
@@ -151,7 +151,7 @@ async def get_current_user_or_api_key(
                     )
                 # Update last_used_at in a separate session to avoid committing shared session
                 try:
-                    async with get_sessionmaker()() as session:
+                    async with (await get_sessionmaker())() as session:
                         await session.execute(
                             update(ApiKey)
                             .where(ApiKey.id == api_key.id)

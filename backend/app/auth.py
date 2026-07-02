@@ -141,7 +141,7 @@ from app.models import RevokedToken
 
 
 async def revoke_refresh_token(jti: str, expires_at: datetime) -> None:
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         try:
             session.add(RevokedToken(jti=jti, revoked_at=datetime.now(timezone.utc), expires_at=expires_at))
             await session.commit()
@@ -151,14 +151,14 @@ async def revoke_refresh_token(jti: str, expires_at: datetime) -> None:
 
 
 async def is_refresh_token_revoked(jti: str) -> bool:
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         result = await session.execute(select(RevokedToken).where(RevokedToken.jti == jti))
         return result.scalar_one_or_none() is not None
 
 
 async def cleanup_revoked_tokens() -> None:
     """Delete expired revoked token entries."""
-    async with get_sessionmaker()() as session:
+    async with (await get_sessionmaker())() as session:
         from sqlalchemy import delete
         await session.execute(
             delete(RevokedToken).where(RevokedToken.expires_at < datetime.now(timezone.utc))

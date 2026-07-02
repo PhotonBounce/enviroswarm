@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # instead of create_all. create_all does not handle schema migrations,
     # renames, or data migrations.
     if settings.environment.lower() == "development":
-        async with get_engine().begin() as conn:
+        async with (await get_engine()).begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     else:
         logger.warning(
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     yield
     logger.info("Shutting down ENViroSwarm API...")
-    await get_engine().dispose()
+    await (await get_engine()).dispose()
 
 
 app = FastAPI(
@@ -102,7 +102,7 @@ async def health() -> dict:
     """Return service health status, including a lightweight DB ping."""
     try:
         from sqlalchemy import text
-        async with get_engine().connect() as conn:
+        async with (await get_engine()).connect() as conn:
             await conn.execute(text("SELECT 1"))
         return {"success": True, "data": {"status": "ok", "version": "1.0.0"}}
     except Exception as exc:
