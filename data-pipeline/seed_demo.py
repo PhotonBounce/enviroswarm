@@ -24,6 +24,7 @@ from requests.adapters import HTTPAdapter
 
 from generators.station_factory import create_stations
 from generators.reading_generator import generate_all_readings
+from utils import _safe_int, _safe_float
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,20 +41,6 @@ MISSING_RATE = 0.03
 OUTLIER_RATE = 0.01
 
 
-def _safe_int(env_var: str, default: int) -> int:
-    try:
-        return int(os.getenv(env_var, str(default)))
-    except (ValueError, TypeError):
-        return default
-
-
-def _safe_float(env_var: str, default: float) -> float:
-    try:
-        return float(os.getenv(env_var, str(default)))
-    except (ValueError, TypeError):
-        return default
-
-
 BATCH_SIZE = _safe_int("BATCH_SIZE", 500)
 BATCH_DELAY_SECONDS = _safe_float("BATCH_DELAY_SECONDS", 0.2)
 DEFAULT_INGEST_TIMEOUT = _safe_float("INGEST_TIMEOUT", 30.0)
@@ -68,7 +55,7 @@ def _make_session() -> requests.Session:
         total=3,
         backoff_factor=1,
         status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["POST", "GET", "DELETE", "PATCH"],
+        allowed_methods=["POST", "GET", "DELETE"],
     )
     adapter = HTTPAdapter(max_retries=retry_strategy)
     session.mount("http://", adapter)
@@ -258,9 +245,9 @@ def _ingest_with_payload(
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "X-Idempotency-Key": hashlib.sha256(json.dumps(payload).encode("utf-8")).hexdigest(),
+        "X-Idempotency-Key": hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest(),
     }
-    raw_json = json.dumps(payload).encode("utf-8")
+    raw_json = json.dumps(payload, sort_keys=True).encode("utf-8")
     if len(raw_json) > 1024:
         compressed = gzip.compress(raw_json)
         headers["Content-Encoding"] = "gzip"
@@ -354,8 +341,6 @@ def run_seed(
         raise ValueError("email must not be empty")
     if not password:
         raise ValueError("password must not be empty")
-    if tier not in {"free", "pro", "enterprise"}:
-        raise ValueError("tier must be one of: free, pro, enterprise")
     if duration_months < 1:
         raise ValueError("duration_months must be >= 1")
     if batch_size <= 0:
@@ -413,6 +398,17 @@ def run_seed(
                 print(f"  FATAL: Could not login: {e}")
                 summary["api_errors"] += 1
                 return summary
+
+            # Validate tier dynamically against backend pricing
+            try:
+                pricing = get_pricing(session, effective_api_base)
+                valid_tiers = {p.get("name") for p in pricing if isinstance(p, dict) and p.get("name")}
+                if tier not in valid_tiers:
+                    raise ValueError(f"tier must be one of: {', '.join(sorted(valid_tiers))}")
+            except ValueError:
+                raise
+            except Exception as e:
+                print(f"  Could not validate tier against pricing: {e}")
 
             print(f"[3/7] Upgrading tier to {tier}...")
             try:
@@ -685,8 +681,6 @@ def main():
         raise ValueError("days must be > 0")
     if not args.email:
         raise ValueError("email must not be empty")
-    if args.tier not in {"free", "pro", "enterprise"}:
-        raise ValueError("tier must be one of: free, pro, enterprise")
     if args.batch_delay < 0:
         raise ValueError("batch_delay must be >= 0")
     if args.ingest_timeout <= 0:
