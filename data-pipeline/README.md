@@ -23,7 +23,7 @@ This starts an Eclipse Mosquitto broker on:
 ### 3. Set Demo Password
 
 ```bash
-export DEMO_PASSWORD=Demo12345!
+export DEMO_PASSWORD=<your-demo-password>
 ```
 
 > The `DEMO_PASSWORD` environment variable is **required**.
@@ -43,7 +43,7 @@ python seed_demo.py
 
 `seed_demo.py` performs the following steps:
 
-1. **Registers a demo user** (`demo@enviroswarm.local` / `Demo12345!`) if not already present
+1. **Registers a demo user** (`demo@enviroswarm.local` / `<your-demo-password>`) if not already present
 2. **Logs in** to obtain a JWT access token
 3. **Creates 30 simulated sensor stations** across 5 cities:
    - New York City, USA
@@ -96,7 +96,7 @@ data-pipeline/
 ## Troubleshooting
 
 - **Backend not running**: Ensure `docker-compose up --build -d` is running in the `backend/` directory before running the full seeder.
-- **DEMO_PASSWORD missing**: If you see `DEMO_PASSWORD environment variable is required`, export it first: `export DEMO_PASSWORD=Demo12345!` or pass `--password`.
+- **DEMO_PASSWORD missing**: If you see `DEMO_PASSWORD environment variable is required`, export it first: `export DEMO_PASSWORD=<your-demo-password>` or pass `--password`.
 - **Auth failures**: The demo user is auto-created; if it already exists, the script will login instead. You can override credentials with `--email`, `--password`, and `--tier` flags.
 - **Rate limiting**: If you hit rate limits, increase `--batch-delay` or reduce `--batch-size`.
 - **Appending readings**: Use `--append` to add new readings to existing stations without creating duplicates.
