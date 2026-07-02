@@ -1,30 +1,23 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Leaf, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLogin } from '@/hooks/useApi'
-import { useAuth } from '@/hooks/useAuth'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const loginMutation = useLogin()
-  const { login } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     try {
       await loginMutation.mutateAsync({ email: email.trim(), password })
-      login({
-        id: '',
-        email: email.trim(),
-        tier: 'free',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      navigate('/')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'
       setError(message)

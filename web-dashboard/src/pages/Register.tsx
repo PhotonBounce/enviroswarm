@@ -1,10 +1,9 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Leaf, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useRegister } from '@/hooks/useApi'
-import { useAuth } from '@/hooks/useAuth'
 
 export default function Register() {
   const [email, setEmail] = useState('')
@@ -12,7 +11,7 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const registerMutation = useRegister()
-  const { login } = useAuth()
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,13 +30,7 @@ export default function Register() {
     }
     try {
       await registerMutation.mutateAsync({ email: email.trim(), password })
-      login({
-        id: '',
-        email: email.trim(),
-        tier: 'free',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      navigate('/')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
       setError(message)
