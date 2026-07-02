@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK (Local Docker)
 
 on:
   push:
@@ -11,9 +11,6 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./android-app
 
     steps:
       - name: Checkout repository
@@ -27,30 +24,37 @@ jobs:
           cache-dependency-path: ./android-app/package-lock.json
 
       - name: Install dependencies
+        working-directory: ./android-app
         run: npm ci
 
-      - name: Install EAS CLI
-        run: npm install -g eas-cli
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-      - name: Build APK with EAS
-        run: eas build --platform android --profile preview --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Download APK artifact
+      - name: Setup Expo CLI
+        working-directory: ./android-app
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build APK with Gradle
+        working-directory: ./android-app/android
+        run: ./gradlew assembleRelease
+
+      - name: Copy APK artifact
         run: |
-          BUILD_URL=$(eas build:list --platform android --limit 1 --non-interactive --json | jq -r '.[0].artifacts.buildUrl')
-          echo "Build URL: $BUILD_URL"
-          curl -L "$BUILD_URL" -o ../enviroswarm.apk
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          mkdir -p ./output
+          cp ./android-app/android/app/build/outputs/apk/release/app-release.apk ./output/enviroswarm.apk
 
       - name: Upload APK to GitHub Releases
         uses: softprops/action-gh-release@v1
         with:
           tag_name: apk-v${{ github.run_number }}
           name: ENViroSwarm APK v${{ github.run_number }}
-          files: ./enviroswarm.apk
+          files: ./output/enviroswarm.apk
           body: |
             Automated APK build from commit ${{ github.sha }}.
             Download and install on Android devices.
@@ -59,12 +63,8 @@ jobs:
 
       - name: Upload APK to FTP
         run: |
-          if [ -n "$FTP_HOST" ]; then
-            curl -T ../enviroswarm.apk \
-              ftp://$FTP_HOST/public_html/enviroswarm/apk/enviroswarm.apk \
-              --user "$FTP_USER:$FTP_PASS"
+          if [ -n "${{ secrets.FTP_HOST }}" ]; then
+            curl -T ./output/enviroswarm.apk \
+              ftp://${{ secrets.FTP_HOST }}/public_html/enviroswarm/apk/enviroswarm.apk \
+              --user "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}"
           fi
-        env:
-          FTP_HOST: ${{ secrets.FTP_HOST }}
-          FTP_USER: ${{ secrets.FTP_USER }}
-          FTP_PASS: ${{ secrets.FTP_PASS }}
