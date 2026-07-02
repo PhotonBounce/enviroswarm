@@ -246,32 +246,21 @@ def _on_message_factory(q: queue.Queue):
     """Build an on_message callback bound to the given queue."""
     def _on_message(client, userdata, msg):
         """Callback when a message arrives on a subscribed topic."""
-        def _ack_if_needed():
-            if getattr(client, "manual_ack", False):
-                try:
-                    client.ack(msg.mid)
-                except Exception as e:
-                    logger.warning("[MQTT Sub] Manual ack failed for mid %s: %s", msg.mid, e)
         try:
             payload = json.loads(msg.payload.decode("utf-8"))
         except UnicodeDecodeError as e:
             logger.warning("[MQTT Sub] Invalid UTF-8 on %s: %s", msg.topic, e)
-            _ack_if_needed()
             return
         except json.JSONDecodeError as e:
             logger.warning("[MQTT Sub] Invalid JSON on %s: %s", msg.topic, e)
-            _ack_if_needed()
             return
         if not isinstance(payload, dict):
             logger.warning("[MQTT Sub] Invalid payload type on %s: expected dict, got %s", msg.topic, type(payload).__name__)
-            _ack_if_needed()
             return
         try:
             q.put_nowait(payload)
-            _ack_if_needed()
         except queue.Full:
             logger.warning("[MQTT Sub] Queue full (maxsize=%s), dropping message on %s", q.maxsize, msg.topic)
-            # Do not ack; broker will redeliver for QoS 1
     return _on_message
 
 
@@ -354,7 +343,6 @@ def start_subscriber(
         client_id=client_id or f"enviroswarm-sub-{uuid.uuid4().hex[:8]}",
         clean_session=False,
     )
-    client.manual_ack = True
     client.user_data_set({"topic_prefix": topic_prefix})
     client.on_connect = _on_connect
     client.on_message = _on_message_factory(q)
