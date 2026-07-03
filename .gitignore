@@ -6,3 +6,9 @@ ios/
 .env
 __pycache__/
 *.pyc
+deploy/
+*.pem
+*.key
+QA_CYCLE_*.md
+docs/reviews/
+.worktrees/
