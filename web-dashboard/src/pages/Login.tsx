@@ -4,6 +4,7 @@ import { Leaf, Mail, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useLogin, useDemo } from '@/hooks/useApi'
+import { enableDemoMode } from '@/lib/demoData'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -27,6 +28,7 @@ export default function Login() {
 
   const handleDemo = async () => {
     setError('')
+    enableDemoMode()
     try {
       await demoMutation.mutateAsync()
       navigate('/')

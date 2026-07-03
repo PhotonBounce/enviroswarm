@@ -2,6 +2,7 @@ import React, { createContext, useState, useCallback, useEffect, useMemo } from 
 import { useQueryClient } from '@tanstack/react-query'
 import type { User, UserTier } from '@/types'
 import api from '@/lib/api'
+import { enableDemoMode, disableDemoMode, isDemoMode, demoUser } from '@/lib/demoData'
 
 interface AuthContextType {
   user: User | null
@@ -26,29 +27,39 @@ export const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient()
   const [user, setUserState] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Initialize demo mode on mount
+  useEffect(() => {
+    if (isDemoMode()) {
+      setUserState(demoUser)
+      setIsLoading(false)
+    }
+  }, [])
 
   // Listen for unauthorized events from the API interceptor
   useEffect(() => {
     const handler = () => {
       setUserState(null)
+      disableDemoMode()
     }
     window.addEventListener('enviroswarm:unauthorized', handler)
     return () => window.removeEventListener('enviroswarm:unauthorized', handler)
   }, [])
 
   const login = useCallback((newUser: User) => {
-    // Cookie is set by backend (httpOnly, Secure, SameSite). 
-    // Browser handles it automatically — no JS storage needed.
     setUserState(newUser)
   }, [])
 
   const logout = useCallback(async () => {
     try {
-      await api.post('/logout')
+      if (!isDemoMode()) {
+        await api.post('/logout')
+      }
     } catch {
       // Ignore errors — cookie will expire naturally
     }
+    disableDemoMode()
     queryClient.clear()
     setUserState(null)
   }, [queryClient])

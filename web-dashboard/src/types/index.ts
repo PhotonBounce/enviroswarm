@@ -123,3 +123,33 @@ export interface NearbyQueryParams {
   radius_km: number
   sensor_type?: SensorType
 }
+
+export interface Alert {
+  id: string
+  station_id: string
+  sensor_type: SensorType
+  condition: string
+  threshold: number
+  message: string
+  status: string
+  created_at: string
+}
+
+export interface Organization {
+  id: string
+  name: string
+  slug: string
+  role: string
+  member_count: number
+  station_count: number
+  created_at: string
+}
+
+export interface WebhookConfig {
+  id: string
+  url: string
+  events: string[]
+  secret: string
+  active: boolean
+  created_at: string
+}
