@@ -62,7 +62,7 @@ if (!rootEl) {
 ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename="/enviroswarm">
         <AuthProvider>
           <ErrorBoundary>
             <App />

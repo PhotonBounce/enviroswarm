@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { useMe } from '@/hooks/useApi'
+import { isDemoMode, demoUser } from '@/lib/demoData'
 import Layout from '@/components/layout/Layout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
@@ -19,11 +20,23 @@ function App() {
   const { data: meData, isLoading: meLoading } = useMe()
   const [authReady, setAuthReady] = useState(false)
 
+  const demoActive = isDemoMode()
+
   useEffect(() => {
+    if (demoActive) {
+      setUser(demoUser)
+      setAuthReady(true)
+      return
+    }
+    const timer = setTimeout(() => {
+      setAuthReady(true)
+    }, 3000)
     if (!meLoading) {
       setAuthReady(true)
+      clearTimeout(timer)
     }
-  }, [meLoading])
+    return () => clearTimeout(timer)
+  }, [meLoading, demoActive, setUser])
 
   useEffect(() => {
     if (meData) {
@@ -31,8 +44,6 @@ function App() {
     }
   }, [meData, setUser])
 
-  // Clear the ['me'] query cache when the user is logged out to prevent
-  // stale data from re-populating the user state
   useEffect(() => {
     const handler = () => {
       queryClient.removeQueries({ queryKey: ['me'] })

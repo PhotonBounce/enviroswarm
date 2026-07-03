@@ -29,7 +29,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUserState] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Initialize demo mode on mount
   useEffect(() => {
     if (isDemoMode()) {
       setUserState(demoUser)
@@ -37,7 +36,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
-  // Listen for unauthorized events from the API interceptor
   useEffect(() => {
     const handler = () => {
       setUserState(null)
