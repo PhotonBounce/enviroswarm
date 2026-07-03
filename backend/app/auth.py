@@ -168,6 +168,43 @@ async def cleanup_revoked_tokens() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Guest demo user support
+# ---------------------------------------------------------------------------
+
+GUEST_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+def create_guest_token() -> str:
+    """Create a 30-day access token for guest demo users with enterprise tier."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(GUEST_USER_ID),
+        "iat": now,
+        "exp": now + timedelta(days=30),
+        "type": "access",
+        "jti": secrets.token_urlsafe(16),
+        "tier": "enterprise",
+        "is_guest": True,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def get_guest_user() -> User:
+    """Return a synthetic guest User with enterprise tier."""
+    guest = User.__new__(User)
+    guest.id = GUEST_USER_ID
+    guest.email = "demo@enviroswarm.app"
+    guest.hashed_password = ""
+    guest.tier = "enterprise"
+    guest.is_active = True
+    guest.is_verified = True
+    guest.created_at = datetime.now(timezone.utc)
+    guest.updated_at = datetime.now(timezone.utc)
+    guest.deleted_at = None
+    return guest
+
+
+# ---------------------------------------------------------------------------
 # Current user dependency
 # ---------------------------------------------------------------------------
 
@@ -178,6 +215,10 @@ async def _get_user_from_token(token: str, db: AsyncSession) -> User:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
         )
+
+    # Handle guest/demo tokens
+    if user_id == str(GUEST_USER_ID):
+        return get_guest_user()
 
     try:
         user_uuid = uuid.UUID(user_id)

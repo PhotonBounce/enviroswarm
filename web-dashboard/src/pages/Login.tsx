@@ -1,15 +1,16 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Leaf, Mail, Lock } from 'lucide-react'
+import { Leaf, Mail, Lock, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { useLogin } from '@/hooks/useApi'
+import { useLogin, useDemo } from '@/hooks/useApi'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const loginMutation = useLogin()
+  const demoMutation = useDemo()
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,6 +21,17 @@ export default function Login() {
       navigate('/')
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Login failed'
+      setError(message)
+    }
+  }
+
+  const handleDemo = async () => {
+    setError('')
+    try {
+      await demoMutation.mutateAsync()
+      navigate('/')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Demo access failed'
       setError(message)
     }
   }
@@ -72,6 +84,30 @@ export default function Login() {
             {loginMutation.isPending ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
+
+        {/* Demo Access */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-card px-2 text-muted-foreground">or</span>
+          </div>
+        </div>
+
+        <Button
+          variant="outline"
+          className="w-full border-emerald-600/50 text-emerald-400 hover:bg-emerald-950/30 hover:text-emerald-300"
+          onClick={handleDemo}
+          disabled={demoMutation.isPending}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          {demoMutation.isPending ? 'Loading demo...' : 'Try Demo — Free for 30 Days'}
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          No signup required. All features unlocked.
+        </p>
+
         <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link to="/register" className="font-medium text-emerald-400 hover:text-emerald-300">

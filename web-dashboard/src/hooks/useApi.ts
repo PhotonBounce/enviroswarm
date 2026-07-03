@@ -33,6 +33,22 @@ export function useLogin() {
   })
 }
 
+export function useDemo() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const res = await api.post<ApiResponse<LoginResponse & { user: User; message: string }>>('/auth/demo')
+      if (!res.data?.success) {
+        throw new Error(res.data?.error || 'Demo access failed')
+      }
+      return res.data.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+}
+
 export function useRegister() {
   const queryClient = useQueryClient()
   return useMutation({

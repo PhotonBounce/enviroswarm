@@ -11,6 +11,7 @@ import bcrypt
 
 from app.auth import (
     create_access_token,
+    create_guest_token,
     create_refresh_token,
     decode_access_token,
     decode_refresh_token,
@@ -18,6 +19,8 @@ from app.auth import (
     verify_password,
     get_current_user,
     revoke_refresh_token,
+    get_guest_user,
+    GUEST_USER_ID,
 )
 from app.database import get_db
 from app.models import User
@@ -192,6 +195,53 @@ async def login(
             access_token=access_token,
             refresh_token=refresh_token,
         ).model_dump(mode="json")
+    )
+
+
+@router.post("/demo", response_model=StandardResponse)
+async def demo_login(
+    response: Response,
+    request: Request,
+) -> StandardResponse:
+    """Create a guest demo session with full enterprise access for 30 days."""
+    # Rate limit demo creation by IP to prevent abuse
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        from ipaddress import ip_address
+        try:
+            addr = ip_address(client_ip)
+            if addr.is_private or addr.is_loopback:
+                client_ip = forwarded.split(",")[0].strip()
+        except ValueError:
+            pass
+
+    if not await check_rate_limit(f"demo:ip:{client_ip}", "/auth/demo", 5):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many demo attempts from this IP.",
+        )
+
+    access_token = create_guest_token()
+    refresh_token = create_refresh_token(str(GUEST_USER_ID))
+
+    # Set httpOnly cookies for web clients
+    response.set_cookie(value=access_token, **COOKIE_SETTINGS)
+    response.set_cookie(value=refresh_token, **REFRESH_COOKIE_SETTINGS)
+
+    return StandardResponse(
+        data={
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "user": {
+                "id": str(GUEST_USER_ID),
+                "email": "demo@enviroswarm.app",
+                "tier": "enterprise",
+                "is_active": True,
+                "is_verified": True,
+            },
+            "message": "Demo access granted. All features unlocked for 30 days.",
+        }
     )
 
 
