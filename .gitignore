@@ -12,3 +12,4 @@ deploy/
 QA_CYCLE_*.md
 docs/reviews/
 .worktrees/
+screenshots/

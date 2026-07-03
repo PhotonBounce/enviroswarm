@@ -7,10 +7,7 @@ export interface ApiResponse<T> {
   meta?: { page: number; limit: number; total: number }
 }
 
-const apiBaseUrl = import.meta.env.VITE_API_URL
-if (!apiBaseUrl) {
-  throw new Error('VITE_API_URL is not defined. Please set it in your environment.')
-}
+const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const api = axios.create({
   baseURL: `${apiBaseUrl}/api/v1`,
