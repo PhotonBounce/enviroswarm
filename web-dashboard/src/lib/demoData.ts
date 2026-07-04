@@ -412,6 +412,133 @@ export const demoComments: DatasetComment[] = [
 ]
 
 // ---------------------------------------------------------------------------
+// Pollution Demo Data
+// ---------------------------------------------------------------------------
+
+export interface AQIDataPoint {
+  timestamp: string
+  aqi: number
+  pm25: number
+  pm10: number
+  co2: number
+  voc: number
+  no2: number
+  o3: number
+  station_id: string
+}
+
+export interface PollutionAlert {
+  id: string
+  type: 'air' | 'noise' | 'light' | 'water' | 'radiation' | 'thermal'
+  severity: 'low' | 'moderate' | 'high' | 'critical'
+  location: string
+  lat: number
+  lon: number
+  message: string
+  timestamp: string
+  resolved: boolean
+}
+
+export interface PollutionStationMarker {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  type: 'air' | 'noise' | 'light' | 'water' | 'radiation' | 'thermal'
+  aqi: number
+  value: number
+  unit: string
+  lastUpdated: string
+}
+
+export const demoAQIHistory: AQIDataPoint[] = (() => {
+  const data: AQIDataPoint[] = []
+  const baseDate = new Date('2026-07-01T00:00:00Z')
+  for (let h = 0; h < 24; h++) {
+    const ts = new Date(baseDate)
+    ts.setHours(ts.getHours() + h)
+    const baseAQI = 45 + Math.sin(h / 24 * Math.PI * 2) * 30 + Math.random() * 20
+    data.push({
+      timestamp: ts.toISOString(),
+      aqi: Math.round(Math.max(10, Math.min(180, baseAQI))),
+      pm25: Math.round(Math.max(2, baseAQI * 0.6 + Math.random() * 10)),
+      pm10: Math.round(Math.max(5, baseAQI * 0.8 + Math.random() * 15)),
+      co2: Math.round(400 + Math.random() * 150),
+      voc: Math.round(50 + Math.random() * 200),
+      no2: Math.round(10 + Math.random() * 40),
+      o3: Math.round(20 + Math.random() * 60),
+      station_id: '1',
+    })
+  }
+  return data
+})()
+
+export const demoPollutantBreakdown = {
+  pm25: 35,
+  co2: 25,
+  voc: 15,
+  no2: 12,
+  o3: 8,
+  pm10: 5,
+}
+
+export const demoPollutionAlerts: PollutionAlert[] = [
+  { id: 'pa1', type: 'air', severity: 'high', location: 'Downtown Metro', lat: 40.7484, lon: -73.9857, message: 'PM2.5 levels exceeded 75 µg/m³. Unhealthy for sensitive groups.', timestamp: '2026-07-01T08:00:00Z', resolved: false },
+  { id: 'pa2', type: 'noise', severity: 'moderate', location: 'Highway 101', lat: 40.7128, lon: -74.006, message: 'Noise levels reached 85 dB during rush hour.', timestamp: '2026-07-01T07:30:00Z', resolved: false },
+  { id: 'pa3', type: 'radiation', severity: 'low', location: 'Industrial Zone', lat: 40.758, lon: -73.9855, message: 'Background radiation slightly elevated at 0.18 µSv/h.', timestamp: '2026-07-01T06:00:00Z', resolved: true },
+  { id: 'pa4', type: 'water', severity: 'critical', location: 'Riverside Park', lat: 40.730, lon: -73.995, message: 'Water quality index dropped to 42. Possible contamination detected.', timestamp: '2026-07-01T05:00:00Z', resolved: false },
+  { id: 'pa5', type: 'air', severity: 'moderate', location: 'Suburban East', lat: 40.680, lon: -73.950, message: 'Ozone levels reached 120 ppb. Limit outdoor exercise.', timestamp: '2026-07-01T04:00:00Z', resolved: true },
+  { id: 'pa6', type: 'light', severity: 'low', location: 'City Center', lat: 40.720, lon: -74.010, message: 'Light pollution index above 2000 lux during night hours.', timestamp: '2026-07-01T03:00:00Z', resolved: true },
+]
+
+export const demoMapStations: PollutionStationMarker[] = [
+  { id: 'm1', name: 'Central Park Monitor', lat: 40.7128, lon: -74.006, type: 'air', aqi: 52, value: 52, unit: 'AQI', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm2', name: 'Riverside Water', lat: 40.758, lon: -73.9855, type: 'water', aqi: 38, value: 78, unit: 'WQI', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm3', name: 'Downtown Noise', lat: 40.7484, lon: -73.9857, type: 'noise', aqi: 85, value: 85, unit: 'dB', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm4', name: 'Industrial Radiation', lat: 40.730, lon: -73.995, type: 'radiation', aqi: 22, value: 0.12, unit: 'µSv/h', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm5', name: 'City Center Light', lat: 40.720, lon: -74.010, type: 'light', aqi: 110, value: 2100, unit: 'lux', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm6', name: 'Suburban East Air', lat: 40.680, lon: -73.950, type: 'air', aqi: 35, value: 35, unit: 'AQI', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm7', name: 'Harbor Water', lat: 40.690, lon: -74.020, type: 'water', aqi: 65, value: 65, unit: 'WQI', lastUpdated: '2026-07-01T12:00:00Z' },
+  { id: 'm8', name: 'Thermal Plant', lat: 40.770, lon: -73.970, type: 'thermal', aqi: 78, value: 32, unit: '°C', lastUpdated: '2026-07-01T12:00:00Z' },
+]
+
+export function getAQIColor(aqi: number): string {
+  if (aqi <= 50) return '#22c55e'
+  if (aqi <= 100) return '#eab308'
+  if (aqi <= 150) return '#f97316'
+  if (aqi <= 200) return '#ef4444'
+  if (aqi <= 300) return '#a855f7'
+  return '#7f1d1d'
+}
+
+export function getAQILabel(aqi: number): string {
+  if (aqi <= 50) return 'Good'
+  if (aqi <= 100) return 'Moderate'
+  if (aqi <= 150) return 'Unhealthy for Sensitive Groups'
+  if (aqi <= 200) return 'Unhealthy'
+  if (aqi <= 300) return 'Very Unhealthy'
+  return 'Hazardous'
+}
+
+export function getAQIClass(aqi: number): string {
+  if (aqi <= 50) return 'aqi-good'
+  if (aqi <= 100) return 'aqi-moderate'
+  if (aqi <= 150) return 'aqi-unhealthy-sensitive'
+  if (aqi <= 200) return 'aqi-unhealthy'
+  if (aqi <= 300) return 'aqi-very-unhealthy'
+  return 'aqi-hazardous'
+}
+
+export function getHealthAdvice(aqi: number): string {
+  if (aqi <= 50) return 'Air quality is satisfactory. Enjoy outdoor activities.'
+  if (aqi <= 100) return 'Air quality is acceptable. Sensitive individuals should reduce prolonged outdoor exertion.'
+  if (aqi <= 150) return 'Members of sensitive groups may experience health effects. Reduce outdoor activities.'
+  if (aqi <= 200) return 'Everyone may begin to experience health effects. Avoid prolonged outdoor exertion.'
+  if (aqi <= 300) return 'Health warnings of emergency conditions. Avoid all outdoor exertion.'
+  return 'Health alert: everyone may experience more serious health effects. Stay indoors.'
+}
+
+// ---------------------------------------------------------------------------
 // Demo mode helpers
 // ---------------------------------------------------------------------------
 

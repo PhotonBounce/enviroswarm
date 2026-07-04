@@ -86,3 +86,32 @@
     @apply bg-white/60 dark:bg-black/40 backdrop-blur-xl border border-white/40 dark:border-white/20;
   }
 }
+
+/* AQI Pollution Alert Colors */
+.aqi-good { color: #22c55e; }
+.aqi-moderate { color: #eab308; }
+.aqi-unhealthy-sensitive { color: #f97316; }
+.aqi-unhealthy { color: #ef4444; }
+.aqi-very-unhealthy { color: #a855f7; }
+.aqi-hazardous { color: #7f1d1d; }
+
+.aqi-bg-good { background-color: #22c55e; }
+.aqi-bg-moderate { background-color: #eab308; }
+.aqi-bg-unhealthy-sensitive { background-color: #f97316; }
+.aqi-bg-unhealthy { background-color: #ef4444; }
+.aqi-bg-very-unhealthy { background-color: #a855f7; }
+.aqi-bg-hazardous { background-color: #7f1d1d; }
+
+.aqi-border-good { border-color: #22c55e; }
+.aqi-border-moderate { border-color: #eab308; }
+.aqi-border-unhealthy-sensitive { border-color: #f97316; }
+.aqi-border-unhealthy { border-color: #ef4444; }
+.aqi-border-very-unhealthy { border-color: #a855f7; }
+.aqi-border-hazardous { border-color: #7f1d1d; }
+
+.aqi-glow-good { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+.aqi-glow-moderate { box-shadow: 0 0 20px rgba(234, 179, 8, 0.3); }
+.aqi-glow-unhealthy-sensitive { box-shadow: 0 0 20px rgba(249, 115, 22, 0.3); }
+.aqi-glow-unhealthy { box-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+.aqi-glow-very-unhealthy { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+.aqi-glow-hazardous { box-shadow: 0 0 20px rgba(127, 29, 29, 0.3); }
