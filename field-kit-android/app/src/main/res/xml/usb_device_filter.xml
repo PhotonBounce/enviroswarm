@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- FTDI FT232R/FT232H -->
+    <usb-device vendor-id="1027" product-id="24596" />
+    <usb-device vendor-id="1027" product-id="24597" />
+    <usb-device vendor-id="1027" product-id="24592" />
+    <usb-device vendor-id="1027" product-id="24593" />
+
+    <!-- Silicon Labs CP2102/CP2104/CP2105/CP2108 -->
+    <usb-device vendor-id="4292" product-id="60000" />
+    <usb-device vendor-id="4292" product-id="60016" />
+    <usb-device vendor-id="4292" product-id="60017" />
+    <usb-device vendor-id="4292" product-id="60032" />
+
+    <!-- QinHeng CH340/CH341 -->
+    <usb-device vendor-id="6790" product-id="29987" />
+    <usb-device vendor-id="6790" product-id="21795" />
+    <usb-device vendor-id="6790" product-id="21972" />
+
+    <!-- Prolific PL2303 -->
+    <usb-device vendor-id="1659" product-id="8963" />
+    <usb-device vendor-id="1659" product-id="9138" />
+
+    <!-- Arduino (Uno, Mega, etc.) -->
+    <usb-device vendor-id="9025" product-id="67" />
+    <usb-device vendor-id="9025" product-id="66" />
+    <usb-device vendor-id="9025" product-id="68" />
+
+    <!-- STM32 Virtual COM -->
+    <usb-device vendor-id="1155" product-id="22336" />
+
+    <!-- Raspberry Pi Pico (RP2040) -->
+    <usb-device vendor-id="11914" product-id="5" />
+    <usb-device vendor-id="11914" product-id="10" />
+
+    <!-- Generic CDC/ACM -->
+    <usb-device vendor-id="7531" product-id="2" />
+</resources>

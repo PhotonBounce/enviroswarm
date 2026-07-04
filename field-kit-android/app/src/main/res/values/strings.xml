@@ -1,0 +1,70 @@
+<resources>
+    <string name="app_name">ENViroSwarm Field Kit</string>
+    <string name="app_name_debug">ENViroSwarm Field Kit (Debug)</string>
+
+    <!-- Navigation labels -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_sensors">Sensors</string>
+    <string name="nav_realtime">Realtime</string>
+    <string name="nav_calibration">Calibration</string>
+    <string name="nav_export">Export</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Air Quality Dashboard</string>
+    <string name="aqi_label">AQI</string>
+    <string name="pm25_label">PM2.5</string>
+    <string name="pm10_label">PM10</string>
+    <string name="co2_label">CO₂</string>
+    <string name="temp_label">Temperature</string>
+    <string name="humidity_label">Humidity</string>
+    <string name="pressure_label">Pressure</string>
+    <string name="start_reading">Start Reading</string>
+    <string name="stop_reading">Stop Reading</string>
+    <string name="last_reading">Last reading: %1$s</string>
+    <string name="no_reading">No reading yet</string>
+    <string name="sensor_connected">Connected</string>
+    <string name="sensor_disconnected">Disconnected</string>
+    <string name="sensor_connecting">Connecting…</string>
+    <string name="usb_status">USB</string>
+    <string name="ble_status">Bluetooth</string>
+
+    <!-- Realtime -->
+    <string name="realtime_title">Realtime Monitor</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="export_csv">Export CSV</string>
+    <string name="chart_config">Configure</string>
+    <string name="clear_data">Clear</string>
+
+    <!-- AQI Labels -->
+    <string name="aqi_good">Good</string>
+    <string name="aqi_moderate">Moderate</string>
+    <string name="aqi_unhealthy_sensitive">Unhealthy for Sensitive Groups</string>
+    <string name="aqi_unhealthy">Unhealthy</string>
+    <string name="aqi_very_unhealthy">Very Unhealthy</string>
+    <string name="aqi_hazardous">Hazardous</string>
+
+    <!-- Health Advice -->
+    <string name="advice_good">Air quality is satisfactory. Enjoy outdoor activities!</string>
+    <string name="advice_moderate">Air quality is acceptable. Sensitive individuals should limit prolonged outdoor exertion.</string>
+    <string name="advice_unhealthy_sensitive">Sensitive groups should reduce outdoor exertion. Others can enjoy normal activities.</string>
+    <string name="advice_unhealthy">Everyone should reduce outdoor exertion. Sensitive groups should avoid prolonged outdoor activity.</string>
+    <string name="advice_very_unhealthy">Avoid outdoor activities. Keep windows closed and use air purifiers indoors.</string>
+    <string name="advice_hazardous">Emergency conditions. Stay indoors and seek medical attention if experiencing symptoms.</string>
+
+    <!-- Units -->
+    <string name="unit_ug_m3">μg/m³</string>
+    <string name="unit_ppm">ppm</string>
+    <string name="unit_ppb">ppb</string>
+    <string name="unit_celsius">°C</string>
+    <string name="unit_fahrenheit">°F</string>
+    <string name="unit_hpa">hPa</string>
+    <string name="unit_percent">%%</string>
+
+    <!-- Errors -->
+    <string name="error_usb_permission">USB permission denied</string>
+    <string name="error_usb_disconnect">USB device disconnected</string>
+    <string name="error_usb_timeout">USB read timeout</string>
+    <string name="error_usb_corrupt">Corrupt sensor data</string>
+    <string name="error_no_sensor">No sensor detected</string>
+</resources>

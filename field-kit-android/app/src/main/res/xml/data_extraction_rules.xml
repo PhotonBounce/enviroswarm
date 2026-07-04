@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="com.enviroswarm.fieldkit_preferences"/>
+        <include domain="database" path="fieldkit_database"/>
+        <exclude domain="sharedpref" path="device.xml"/>
+    </cloud-backup>
+</data-extraction-rules>
