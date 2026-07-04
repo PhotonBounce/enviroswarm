@@ -327,3 +327,278 @@ class SubscriptionResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+
+class ReportGenerateRequest(BaseModel):
+    station_id: Optional[UUID] = None
+    date_range_start: Optional[datetime] = None
+    date_range_end: Optional[datetime] = None
+    report_format: str = Field(..., pattern="^(pdf|csv|excel)$")
+    name: str = Field(..., min_length=1, max_length=255)
+
+    @field_validator("date_range_end", mode="after")
+    @classmethod
+    def validate_date_range(cls, v: Optional[datetime], info) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        start = info.data.get("date_range_start")
+        if start and v <= start:
+            raise ValueError("date_range_end must be after date_range_start")
+        return v
+
+    @field_validator("date_range_start", mode="after")
+    @classmethod
+    def validate_start(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v
+
+
+class ReportResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    station_id: Optional[UUID] = None
+    name: str
+    report_format: str
+    status: str
+    date_range_start: Optional[datetime] = None
+    date_range_end: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Share / Public Dashboard
+# ---------------------------------------------------------------------------
+
+class ShareCreateRequest(BaseModel):
+    station_id: Optional[UUID] = None
+    expires_at: Optional[datetime] = None
+
+    @field_validator("expires_at", mode="after")
+    @classmethod
+    def validate_expires_at(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        if v <= datetime.now(timezone.utc):
+            raise ValueError("expires_at must be in the future")
+        return v
+
+
+class ShareResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    station_id: Optional[UUID] = None
+    token: str
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublicDashboardResponse(BaseModel):
+    station: Optional[StationResponse] = None
+    readings: List[DataQueryResponse] = []
+
+
+# ---------------------------------------------------------------------------
+# Predictive Analytics
+# ---------------------------------------------------------------------------
+
+class ForecastPoint(BaseModel):
+    timestamp: datetime
+    predicted_value: float
+    confidence_lower: Optional[float] = None
+    confidence_upper: Optional[float] = None
+
+
+class ForecastResponse(BaseModel):
+    station_id: UUID
+    sensor_type: str
+    horizon: str
+    points: List[ForecastPoint]
+
+
+class AnomalyPoint(BaseModel):
+    timestamp: datetime
+    value: float
+    sensor_type: str
+    unit: str
+    deviation_factor: float
+
+
+class AnomalyResponse(BaseModel):
+    station_id: UUID
+    sensor_type: str
+    anomalies: List[AnomalyPoint]
+    total_readings: int
+    anomaly_count: int
+
+
+# ---------------------------------------------------------------------------
+# Data Quality
+# ---------------------------------------------------------------------------
+
+class QualityMetrics(BaseModel):
+    uptime_percentage: float
+    completeness_percentage: float
+    calibration_age_days: Optional[int] = None
+    last_reading_at: Optional[datetime] = None
+    expected_interval_minutes: int
+    actual_interval_minutes: Optional[float] = None
+
+
+class QualityScoreResponse(BaseModel):
+    station_id: UUID
+    overall_score: float  # 0-100
+    metrics: QualityMetrics
+
+
+# ---------------------------------------------------------------------------
+# Audit Logs
+# ---------------------------------------------------------------------------
+
+class AuditLogResponse(BaseModel):
+    id: UUID
+    user_id: Optional[UUID] = None
+    action: str
+    entity_type: str
+    entity_id: Optional[str] = None
+    old_values: Optional[Dict[str, Any]] = None
+    new_values: Optional[Dict[str, Any]] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Alerts
+# ---------------------------------------------------------------------------
+
+NOTIFY_METHODS = ["email", "webhook", "push"]
+ALERT_CONDITIONS = ["gt", "lt", "eq", "gte", "lte"]
+
+
+class AlertCreateRequest(BaseModel):
+    station_id: UUID
+    name: str = Field(..., min_length=1, max_length=255)
+    sensor_type: str
+    condition: str
+    threshold: float = Field(..., ge=-1e9, le=1e9)
+    notify_methods: List[str] = Field(default_factory=list)
+    cooldown_minutes: int = Field(default=60, ge=0, le=10080)
+    is_active: bool = True
+
+    @field_validator("sensor_type", mode="before")
+    @classmethod
+    def validate_sensor_type(cls, v: str) -> str:
+        if v not in SENSOR_TYPES:
+            raise ValueError(f"Invalid sensor_type. Must be one of: {SENSOR_TYPES}")
+        return v
+
+    @field_validator("condition", mode="before")
+    @classmethod
+    def validate_condition(cls, v: str) -> str:
+        if v not in ALERT_CONDITIONS:
+            raise ValueError(f"Invalid condition. Must be one of: {ALERT_CONDITIONS}")
+        return v
+
+    @field_validator("notify_methods", mode="before")
+    @classmethod
+    def validate_notify_methods(cls, v: List[str]) -> List[str]:
+        invalid = [m for m in v if m not in NOTIFY_METHODS]
+        if invalid:
+            raise ValueError(f"Invalid notify_methods: {invalid}. Must be one of: {NOTIFY_METHODS}")
+        return list(dict.fromkeys(v))  # deduplicate preserve order
+
+
+class AlertUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    sensor_type: Optional[str] = None
+    condition: Optional[str] = None
+    threshold: Optional[float] = Field(None, ge=-1e9, le=1e9)
+    notify_methods: Optional[List[str]] = None
+    cooldown_minutes: Optional[int] = Field(None, ge=0, le=10080)
+    is_active: Optional[bool] = None
+
+    @field_validator("sensor_type", mode="before")
+    @classmethod
+    def validate_sensor_type(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in SENSOR_TYPES:
+            raise ValueError(f"Invalid sensor_type. Must be one of: {SENSOR_TYPES}")
+        return v
+
+    @field_validator("condition", mode="before")
+    @classmethod
+    def validate_condition(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in ALERT_CONDITIONS:
+            raise ValueError(f"Invalid condition. Must be one of: {ALERT_CONDITIONS}")
+        return v
+
+    @field_validator("notify_methods", mode="before")
+    @classmethod
+    def validate_notify_methods(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        invalid = [m for m in v if m not in NOTIFY_METHODS]
+        if invalid:
+            raise ValueError(f"Invalid notify_methods: {invalid}. Must be one of: {NOTIFY_METHODS}")
+        return list(dict.fromkeys(v))
+
+
+class AlertResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    station_id: UUID
+    name: str
+    sensor_type: str
+    condition: str
+    threshold: float
+    notify_methods: List[str]
+    cooldown_minutes: int
+    is_active: bool
+    last_triggered_at: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Data Aggregation
+# ---------------------------------------------------------------------------
+
+class AggregationResponse(BaseModel):
+    bucket: datetime
+    sensor_type: str
+    unit: str
+    avg_value: Optional[float] = None
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    count: int
+
+    id: UUID
+    user_id: UUID
+    tier: str
+    start_date: datetime
+    end_date: datetime
+    payment_status: str
+    payment_intent_id: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
