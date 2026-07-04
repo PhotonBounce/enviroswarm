@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Search, Download, ChevronLeft, ChevronRight } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import { Search, Download, ChevronLeft, ChevronRight, Share2, Calendar, BarChart3, Map as MapIcon, MessageSquare } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -8,6 +8,13 @@ import { Badge } from '@/components/ui/Badge'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/Table'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import SensorChart from '@/components/charts/SensorChart'
+import CalendarView from '@/components/CalendarView'
+import HeatmapView from '@/components/HeatmapView'
+import DataComparison from '@/components/DataComparison'
+import ShareModal from '@/components/ShareModal'
+import ExportWidget from '@/components/ExportWidget'
+import AnnotationForm from '@/components/AnnotationForm'
+import type { Annotation } from '@/components/AnnotationForm'
 import { useStations, useSensorData } from '@/hooks/useApi'
 import { formatDate, capitalize, formatNumber } from '@/lib/utils'
 import type { SensorType, SensorReading } from '@/types'
@@ -28,6 +35,16 @@ export default function DataExplorer() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(50)
   const [dateError, setDateError] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
+  const [annotations, setAnnotations] = useState<Annotation[]>(() => {
+    if (typeof window === 'undefined') return []
+    try {
+      const saved = localStorage.getItem('enviroswarm_annotations')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const [queryParams, setQueryParams] = useState<{
     station_id?: string
     sensor_type?: SensorType
@@ -40,6 +57,40 @@ export default function DataExplorer() {
   const { data: response, isLoading, error: queryError } = useSensorData(queryParams)
   const readings = response?.readings ?? []
   const meta = response?.meta
+
+  const persistAnnotations = (next: Annotation[]) => {
+    setAnnotations(next)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('enviroswarm_annotations', JSON.stringify(next))
+    }
+  }
+
+  const handleAddAnnotation = (readingId: string, text: string) => {
+    const newAnnotation: Annotation = {
+      id: `ann-${Date.now()}`,
+      readingId,
+      author: 'You',
+      text,
+      timestamp: new Date().toISOString(),
+      replies: [],
+    }
+    persistAnnotations([...annotations, newAnnotation])
+  }
+
+  const handleAddReply = (annotationId: string, text: string) => {
+    const next = annotations.map((a) =>
+      a.id === annotationId
+        ? {
+            ...a,
+            replies: [
+              ...a.replies,
+              { id: `rep-${Date.now()}`, author: 'You', text, timestamp: new Date().toISOString() },
+            ],
+          }
+        : a
+    )
+    persistAnnotations(next)
+  }
 
   const handleSearch = () => {
     setDateError('')
@@ -79,43 +130,34 @@ export default function DataExplorer() {
     setQueryParams((prev) => ({ ...prev, page: 1, limit: newLimit }))
   }
 
-  const handleExportCsv = () => {
-    if (!readings.length) return
-    const headers = ['timestamp', 'station_id', 'sensor_type', 'value', 'unit']
-    const rows = readings.map((r: SensorReading) => [
-      r.timestamp,
-      r.station_id,
-      r.sensor_type,
-      String(Number.isFinite(r.value) ? r.value : '—'),
-      r.unit,
-    ])
-    const escapeCsv = (value: string) => {
-      if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes('\r')) {
-        return `"${value.replace(/"/g, '""')}"`
-      }
-      return value
-    }
-    const csv = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.map((value) => escapeCsv(String(value))).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'sensor-data.csv'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
-
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1
-  const stationNameMap = new Map((stations?.map((s) => [s.id, s.name]) ?? []))
+  const stationNameMap: Map<string, string> = new Map((stations?.map((s) => [s.id, s.name]) ?? []))
+
+  const currentStationName = stationNameMap.get(stationId) || undefined
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Data Explorer</h1>
-        <p className="text-muted-foreground">Query and visualize sensor data</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Data Explorer</h1>
+          <p className="text-muted-foreground">Query and visualize sensor data</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ExportWidget readings={readings} stationName={currentStationName} />
+          <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}>
+            <Share2 className="mr-1.5 h-4 w-4" />
+            Share
+          </Button>
+        </div>
       </div>
+
+      <ShareModal
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title="Share Data Explorer"
+        itemType="data"
+        shareText="Check out this sensor data on ENViroSwarm"
+      />
 
       <Card>
         <CardHeader>
@@ -156,10 +198,6 @@ export default function DataExplorer() {
               <Search className="mr-2 h-4 w-4" />
               Run Query
             </Button>
-            <Button variant="outline" onClick={handleExportCsv} disabled={!readings.length}>
-              <Download className="mr-2 h-4 w-4" />
-              Export CSV
-            </Button>
             {dateError && <div role="alert" className="w-full text-sm text-red-400">{dateError}</div>}
             <div className="ml-auto flex items-center gap-2">
               <label htmlFor="limit-select" className="text-sm text-muted-foreground">Per page:</label>
@@ -177,7 +215,20 @@ export default function DataExplorer() {
         <TabsList>
           <TabsTrigger value="chart">Chart</TabsTrigger>
           <TabsTrigger value="table">Table</TabsTrigger>
+          <TabsTrigger value="calendar">
+            <Calendar className="mr-1.5 h-3.5 w-3.5" />
+            Calendar
+          </TabsTrigger>
+          <TabsTrigger value="heatmap">
+            <MapIcon className="mr-1.5 h-3.5 w-3.5" />
+            Heatmap
+          </TabsTrigger>
+          <TabsTrigger value="comparison">
+            <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+            Compare
+          </TabsTrigger>
         </TabsList>
+
         <TabsContent value="chart">
           <Card>
             <CardHeader>
@@ -196,6 +247,7 @@ export default function DataExplorer() {
             </CardContent>
           </Card>
         </TabsContent>
+
         <TabsContent value="table">
           <Card>
             <CardHeader>
@@ -222,6 +274,7 @@ export default function DataExplorer() {
                         <TableHead>Type</TableHead>
                         <TableHead>Value</TableHead>
                         <TableHead>Unit</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -234,6 +287,15 @@ export default function DataExplorer() {
                           </TableCell>
                           <TableCell className="font-mono">{typeof reading.value === 'number' ? formatNumber(reading.value, 3) : reading.value}</TableCell>
                           <TableCell>{reading.unit}</TableCell>
+                          <TableCell className="text-right">
+                            <AnnotationForm
+                              readingId={reading.id}
+                              readingLabel={`${capitalize(reading.sensor_type)}: ${reading.value} ${reading.unit}`}
+                              annotations={annotations}
+                              onAddAnnotation={handleAddAnnotation}
+                              onAddReply={handleAddReply}
+                            />
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -269,6 +331,29 @@ export default function DataExplorer() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Data Availability Calendar
+              </CardTitle>
+              <CardDescription>Color-coded calendar showing data volume by day</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CalendarView readings={readings} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="heatmap">
+          <HeatmapView stations={stations ?? []} readings={readings} />
+        </TabsContent>
+
+        <TabsContent value="comparison">
+          <DataComparison stations={stations ?? []} readings={readings} />
         </TabsContent>
       </Tabs>
     </div>
