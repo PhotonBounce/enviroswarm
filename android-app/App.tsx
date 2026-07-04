@@ -8,6 +8,11 @@ import { AuthProvider, useAuthContext } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
+import PollutionDashboardScreen from './src/screens/PollutionDashboardScreen';
+import ExposureTrackerScreen from './src/screens/ExposureTrackerScreen';
+import CommunityMapScreen from './src/screens/CommunityMapScreen';
+import NoiseMeterScreen from './src/screens/NoiseMeterScreen';
+import LightMeterScreen from './src/screens/LightMeterScreen';
 import StationsScreen from './src/screens/StationsScreen';
 import SubmitReadingScreen from './src/screens/SubmitReadingScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -34,6 +39,13 @@ function MainTabs() {
         tabBarInactiveTintColor: '#64748b',
       }}
     >
+      <Tab.Screen
+        name="Dashboard"
+        component={PollutionDashboardScreen}
+        options={{
+          tabBarLabel: ({ focused }) => <TabLabel label="Dashboard" focused={focused} />,
+        }}
+      />
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -92,6 +104,50 @@ function RootNavigator() {
               headerTintColor: '#10b981',
               headerTitleStyle: { color: '#f1f5f9' },
               title: 'Station Data',
+            }}
+          />
+          <Stack.Screen
+            name="ExposureTracker"
+            component={ExposureTrackerScreen}
+            options={{
+              headerShown: true,
+              headerStyle: { backgroundColor: '#0f172a' },
+              headerTintColor: '#10b981',
+              headerTitleStyle: { color: '#f1f5f9' },
+              title: 'Exposure Tracker',
+            }}
+          />
+          <Stack.Screen
+            name="CommunityMap"
+            component={CommunityMapScreen}
+            options={{
+              headerShown: true,
+              headerStyle: { backgroundColor: '#0f172a' },
+              headerTintColor: '#10b981',
+              headerTitleStyle: { color: '#f1f5f9' },
+              title: 'Community Map',
+            }}
+          />
+          <Stack.Screen
+            name="NoiseMeter"
+            component={NoiseMeterScreen}
+            options={{
+              headerShown: true,
+              headerStyle: { backgroundColor: '#0f172a' },
+              headerTintColor: '#10b981',
+              headerTitleStyle: { color: '#f1f5f9' },
+              title: 'Noise Meter',
+            }}
+          />
+          <Stack.Screen
+            name="LightMeter"
+            component={LightMeterScreen}
+            options={{
+              headerShown: true,
+              headerStyle: { backgroundColor: '#0f172a' },
+              headerTintColor: '#10b981',
+              headerTitleStyle: { color: '#f1f5f9' },
+              title: 'Light Meter',
             }}
           />
         </>

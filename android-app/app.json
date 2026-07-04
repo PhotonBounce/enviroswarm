@@ -23,7 +23,11 @@
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION"
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "package": "com.enviroswarm.app"
     },
@@ -35,6 +39,20 @@
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow ENViroSwarm to use your location for sensor data collection and nearby station discovery."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow ENViroSwarm to use your microphone for noise level measurement."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10b981",
+          "sounds": ["./assets/notification-sound.wav"]
         }
       ]
     ]
