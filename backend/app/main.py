@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.database import get_engine, Base
-from app.routers import auth, stations, ingest, data, apikeys, billing
+from app.routers import auth, stations, ingest, data, apikeys, billing, reports, share, analytics, audit, alerts
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -94,6 +94,11 @@ app.include_router(ingest.router, prefix="/api/v1")
 app.include_router(data.router, prefix="/api/v1")
 app.include_router(apikeys.router, prefix="/api/v1")
 app.include_router(billing.router, prefix="/api/v1")
+app.include_router(reports.router, prefix="/api/v1")
+app.include_router(share.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+app.include_router(alerts.router, prefix="/api/v1")
 
 
 # Health check (must be at /api/v1/health for load balancers)
