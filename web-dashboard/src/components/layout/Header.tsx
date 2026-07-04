@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, User, X, Smartphone, FileText, Globe, Users, FolderGit2, BookOpen, ChevronDown } from 'lucide-react'
+import { Menu, Bell, User, X, Smartphone, FileText, Globe, Users, FolderGit2, BookOpen, ChevronDown, MapPin, Heart, Shield, Activity } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import SearchBar from '@/components/SearchBar'
@@ -10,6 +10,10 @@ import { getDemoData } from '@/lib/demoData'
 
 const mobileNavItems = [
   { path: '/', label: 'Dashboard' },
+  { path: '/landing', label: 'Overview' },
+  { path: '/map', label: 'Pollution Map' },
+  { path: '/health', label: 'Health Impact' },
+  { path: '/alerts', label: 'Community Alerts' },
   { path: '/portal', label: 'Portal' },
   { path: '/community', label: 'Community' },
   { path: '/project/proj1', label: 'Projects' },
@@ -141,6 +145,34 @@ export default function Header() {
 
         <div className="flex items-center gap-3">
           <nav className="hidden lg:flex items-center gap-1 mr-2">
+            <Link
+              to="/landing"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Shield className="h-4 w-4" />
+              Overview
+            </Link>
+            <Link
+              to="/map"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <MapPin className="h-4 w-4" />
+              Map
+            </Link>
+            <Link
+              to="/health"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Heart className="h-4 w-4" />
+              Health
+            </Link>
+            <Link
+              to="/alerts"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Activity className="h-4 w-4" />
+              Alerts
+            </Link>
             <Link
               to="/portal"
               className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

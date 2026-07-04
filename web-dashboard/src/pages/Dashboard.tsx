@@ -1,10 +1,21 @@
 import { useMemo, useState, useEffect } from 'react'
-import { Radio, BarChart3, Zap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Radio, BarChart3, Zap, Wind, Shield, MapPin, Activity } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { GlassCard } from '@/components/ui/GlassCard'
+import { Button } from '@/components/ui/Button'
 import { useStations, useSensorData } from '@/hooks/useApi'
 import { capitalize, formatDate, formatNumber } from '@/lib/utils'
+import { demoAQIHistory, getAQIClass, getAQIColor, getAQILabel } from '@/lib/demoData'
+import AQIGauge from '@/components/pollution/AQIGauge'
+import PollutantBreakdown from '@/components/pollution/PollutantBreakdown'
+import HealthAdvisory from '@/components/pollution/HealthAdvisory'
+import ExposureTracker from '@/components/pollution/ExposureTracker'
 import type { SensorStation } from '@/types'
+import { cn } from '@/lib/utils'
 
 export default function Dashboard() {
   const { data: stations, isLoading, error } = useStations()
@@ -66,13 +77,31 @@ export default function Dashboard() {
     }))
   }, [todayResponse, stations])
 
+  const currentAQI = useMemo(() => {
+    const latest = demoAQIHistory[demoAQIHistory.length - 1]
+    return latest?.aqi ?? 58
+  }, [])
+
+  const aqiColor = getAQIColor(currentAQI)
+  const aqiLabel = getAQILabel(currentAQI)
+  const aqiClass = getAQIClass(currentAQI)
+
+  const chartData = useMemo(() => {
+    return demoAQIHistory.map((d) => ({
+      time: new Date(d.timestamp).getHours().toString().padStart(2, '0') + ':00',
+      aqi: d.aqi,
+      pm25: d.pm25,
+    }))
+  }, [])
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your environmental monitoring network</p>
+        <p className="text-muted-foreground">Pollution monitoring overview and health insights</p>
       </div>
 
+      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         {stats.map((stat) => {
           const Icon = stat.icon
@@ -91,6 +120,172 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* Pollution Widgets Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* AQI Gauge */}
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Wind className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Current AQI</h3>
+          </div>
+          <div className="flex items-center justify-center">
+            <AQIGauge aqi={currentAQI} size={140} />
+          </div>
+          <div className="mt-3 text-center">
+            <p className={cn('text-sm font-bold', aqiClass)}>
+              {aqiLabel}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Last updated: {new Date().toLocaleTimeString()}
+            </p>
+          </div>
+        </GlassCard>
+
+        {/* Pollutant Breakdown */}
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Pollutant Breakdown</h3>
+          </div>
+          <PollutantBreakdown />
+        </GlassCard>
+
+        {/* Health Advisory */}
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Health Advisory</h3>
+          </div>
+          <HealthAdvisory aqi={currentAQI} />
+        </GlassCard>
+      </div>
+
+      {/* Trend + Exposure + Map Preview Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Pollution Trend */}
+        <GlassCard className="p-5 lg:col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">24h AQI Trend</h3>
+            </div>
+            <span className={cn('text-xs font-bold px-2 py-1 rounded-full bg-muted', aqiClass)}>
+              AQI {currentAQI}
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="aqiGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={aqiColor} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={aqiColor} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="time" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#1f2937',
+                  border: '1px solid #374151',
+                  borderRadius: '0.5rem',
+                  color: '#f3f4f6',
+                }}
+              />
+              <Area
+                type="monotone"
+                dataKey="aqi"
+                stroke={aqiColor}
+                fill="url(#aqiGradient)"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Area
+                type="monotone"
+                dataKey="pm25"
+                stroke="#f97316"
+                fill="transparent"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div className="flex items-center gap-4 mt-2 justify-center text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="h-2 w-4 rounded" style={{ backgroundColor: aqiColor }} />
+              AQI
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0.5 w-4 rounded" style={{ borderTop: '2px dashed #f97316' }} />
+              PM2.5
+            </span>
+          </div>
+        </GlassCard>
+
+        {/* Exposure Summary */}
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Exposure Summary</h3>
+          </div>
+          <ExposureTracker todayAQI={currentAQI} />
+        </GlassCard>
+      </div>
+
+      {/* Community Map Preview */}
+      <GlassCard className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Community Map Preview</h3>
+          </div>
+          <Link to="/map">
+            <Button variant="outline" size="sm">
+              View Full Map
+            </Button>
+          </Link>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { name: 'Central Park', aqi: 52, type: 'air' },
+            { name: 'Downtown', aqi: 85, type: 'noise' },
+            { name: 'Riverside', aqi: 38, type: 'water' },
+            { name: 'Industrial', aqi: 22, type: 'radiation' },
+          ].map((station) => (
+            <motion.div
+              key={station.name}
+              className={cn(
+                'rounded-lg border p-3 transition-all cursor-pointer hover:opacity-90',
+                station.aqi <= 50 && 'border-emerald-500/30 bg-emerald-500/5',
+                station.aqi > 50 && station.aqi <= 100 && 'border-yellow-500/30 bg-yellow-500/5',
+                station.aqi > 100 && station.aqi <= 150 && 'border-orange-500/30 bg-orange-500/5',
+                station.aqi > 150 && 'border-red-500/30 bg-red-500/5'
+              )}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-muted-foreground">{station.name}</span>
+                <span className={cn('text-xs font-bold', getAQIClass(station.aqi))}>
+                  {station.aqi}
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min((station.aqi / 200) * 100, 100)}%`,
+                    backgroundColor: getAQIColor(station.aqi),
+                  }}
+                />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground capitalize">{station.type} monitoring</p>
+            </motion.div>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Existing content */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>

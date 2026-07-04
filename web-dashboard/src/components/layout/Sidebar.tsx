@@ -1,6 +1,10 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Shield,
+  MapPin,
+  Heart,
+  Bell,
   Radio,
   BarChart3,
   FileText,
@@ -19,6 +23,10 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/landing', label: 'Overview', icon: Shield },
+  { path: '/map', label: 'Pollution Map', icon: MapPin },
+  { path: '/health', label: 'Health Impact', icon: Heart },
+  { path: '/alerts', label: 'Community Alerts', icon: Bell },
   { path: '/portal', label: 'Portal', icon: Globe },
   { path: '/community', label: 'Community', icon: Users },
   { path: '/project/proj1', label: 'Projects', icon: FolderGit2 },

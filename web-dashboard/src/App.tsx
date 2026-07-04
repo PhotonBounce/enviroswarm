@@ -9,6 +9,10 @@ import Layout from '@/components/layout/Layout'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import Dashboard from '@/pages/Dashboard'
+import LandingPage from '@/pages/LandingPage'
+import PollutionMap from '@/pages/PollutionMap'
+import HealthImpact from '@/pages/HealthImpact'
+import CommunityAlerts from '@/pages/CommunityAlerts'
 import Stations from '@/pages/Stations'
 import DataExplorer from '@/pages/DataExplorer'
 import Reports from '@/pages/Reports'
@@ -73,6 +77,10 @@ function App() {
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} />
       <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/map" element={<PollutionMap />} />
+        <Route path="/health" element={<HealthImpact />} />
+        <Route path="/alerts" element={<CommunityAlerts />} />
         <Route path="/stations" element={<Stations />} />
         <Route path="/data" element={<DataExplorer />} />
         <Route path="/reports" element={<Reports />} />
