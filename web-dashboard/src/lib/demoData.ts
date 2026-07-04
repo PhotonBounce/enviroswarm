@@ -3,7 +3,7 @@
  * When the backend is unreachable, all hooks fall back to this data.
  */
 
-import type { User, SensorStation, SensorReading, ApiKey, PricingTier, Alert, Organization, WebhookConfig } from '@/types'
+import type { User, SensorStation, SensorReading, ApiKey, PricingTier, Alert, Organization, WebhookConfig, PublicDataset, Project, ActivityItem, CommunityFeedItem, NotebookEntry, DatasetComment, SensorType } from '@/types'
 
 export const demoUser: User = {
   id: 'demo-id',
@@ -404,7 +404,7 @@ export const demoNotebooks: NotebookEntry[] = [
   },
 ]
 
-export const demoComments: Comment[] = [
+export const demoComments: DatasetComment[] = [
   { id: 'c1', author: 'Dr. Sarah Chen', author_id: 'u1', content: 'Excellent dataset! The temporal resolution is perfect for our urban heat correlation study.', created_at: '2026-07-03T12:00:00Z', likes: 8 },
   { id: 'c2', author: 'Prof. Maria Silva', author_id: 'u2', content: 'Would you consider adding VOC data to this collection? It would be valuable for our combined analysis.', created_at: '2026-07-02T10:00:00Z', likes: 5 },
   { id: 'c3', author: 'Kenji Tanaka', author_id: 'u3', content: 'I\'ve forked this for our Tokyo comparison. The methodology is very solid.', created_at: '2026-07-01T15:00:00Z', likes: 12 },

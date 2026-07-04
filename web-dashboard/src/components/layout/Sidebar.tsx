@@ -9,12 +9,20 @@ import {
   User,
   LogOut,
   Leaf,
+  Globe,
+  Users,
+  FolderGit2,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/portal', label: 'Portal', icon: Globe },
+  { path: '/community', label: 'Community', icon: Users },
+  { path: '/project/proj1', label: 'Projects', icon: FolderGit2 },
+  { path: '/notebook', label: 'Notebook', icon: BookOpen },
   { path: '/stations', label: 'Stations', icon: Radio },
   { path: '/data', label: 'Data Explorer', icon: BarChart3 },
   { path: '/reports', label: 'Reports', icon: FileText },

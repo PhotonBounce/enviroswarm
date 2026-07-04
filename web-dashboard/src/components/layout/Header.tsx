@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Menu, Bell, User, X, Smartphone, FileText } from 'lucide-react'
+import { Menu, Bell, User, X, Smartphone, FileText, Globe, Users, FolderGit2, BookOpen, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import SearchBar from '@/components/SearchBar'
@@ -10,6 +10,10 @@ import { getDemoData } from '@/lib/demoData'
 
 const mobileNavItems = [
   { path: '/', label: 'Dashboard' },
+  { path: '/portal', label: 'Portal' },
+  { path: '/community', label: 'Community' },
+  { path: '/project/proj1', label: 'Projects' },
+  { path: '/notebook', label: 'Notebook' },
   { path: '/stations', label: 'Stations' },
   { path: '/data', label: 'Data' },
   { path: '/reports', label: 'Reports' },
@@ -136,6 +140,37 @@ export default function Header() {
         </div>
 
         <div className="flex items-center gap-3">
+          <nav className="hidden lg:flex items-center gap-1 mr-2">
+            <Link
+              to="/portal"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Globe className="h-4 w-4" />
+              Portal
+            </Link>
+            <Link
+              to="/community"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Users className="h-4 w-4" />
+              Community
+            </Link>
+            <Link
+              to="/project/proj1"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <FolderGit2 className="h-4 w-4" />
+              Projects
+            </Link>
+            <Link
+              to="/notebook"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <BookOpen className="h-4 w-4" />
+              Notebook
+            </Link>
+          </nav>
+
           <SearchBar
             onNavigate={(path) => navigate(path)}
             readings={getDemoData().readings}

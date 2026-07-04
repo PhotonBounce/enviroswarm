@@ -245,7 +245,7 @@ export interface NotebookEntry {
   shared_with: string[]
 }
 
-export interface Comment {
+export interface DatasetComment {
   id: string
   author: string
   author_id: string

@@ -22,7 +22,7 @@ import { getDemoData } from '@/lib/demoData'
 import { getSensorTypeColor, capitalize, formatNumber } from '@/lib/utils'
 import type { PublicDataset, SensorType } from '@/types'
 
-const demoDatasets = getDemoData().publicDatasets
+const demoDatasets: PublicDataset[] = getDemoData().publicDatasets as PublicDataset[]
 
 const regions = ['All Regions', 'North America', 'South America', 'Europe', 'Asia', 'Oceania', 'Arctic']
 const sensorTypes: string[] = ['All Types', 'air_quality', 'temperature', 'humidity', 'noise_level', 'radiation', 'water_quality', 'co2', 'pm25', 'pm10', 'voc']

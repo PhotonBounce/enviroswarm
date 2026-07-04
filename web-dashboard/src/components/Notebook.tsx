@@ -23,10 +23,10 @@ import { Badge } from '@/components/ui/Badge'
 import { Input } from '@/components/ui/Input'
 import { getDemoData } from '@/lib/demoData'
 import { formatDate, capitalize, getSensorTypeColor } from '@/lib/utils'
-import type { NotebookEntry } from '@/types'
+import type { NotebookEntry, PublicDataset } from '@/types'
 
 const demoNotebooks = getDemoData().notebooks
-const demoDatasets = getDemoData().publicDatasets
+const demoDatasets: PublicDataset[] = getDemoData().publicDatasets as PublicDataset[]
 
 function MarkdownPreview({ content }: { content: string }) {
   // Simple markdown rendering
@@ -53,13 +53,13 @@ function MarkdownPreview({ content }: { content: string }) {
 function ChartEmbed({ title, datasetId, sensorType }: { title: string; datasetId: string; sensorType: string }) {
   const dataset = demoDatasets.find((d) => d.id === datasetId)
   const color = getSensorTypeColor(sensorType)
-  const data = dataset?.preview_data.slice(0, 12) || []
-  const values = data.map((d) => d.value)
+  const data: { timestamp: string; value: number; sensor_type: string }[] = dataset?.preview_data.slice(0, 12) || []
+  const values = data.map((d: { value: number }) => d.value)
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1
 
-  const bars = data.map((d, i) => {
+  const bars = data.map((d: { value: number }, i: number) => {
     const height = ((d.value - min) / range) * 100
     return (
       <div

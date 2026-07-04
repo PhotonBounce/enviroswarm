@@ -15,6 +15,11 @@ import Reports from '@/pages/Reports'
 import ApiKeys from '@/pages/ApiKeys'
 import Pricing from '@/pages/Pricing'
 import Profile from '@/pages/Profile'
+import Portal from '@/pages/Portal'
+import ProjectWorkspace from '@/pages/ProjectWorkspace'
+import DatasetDetail from '@/pages/DatasetDetail'
+import Community from '@/pages/Community'
+import Notebook from '@/components/Notebook'
 
 function App() {
   const queryClient = useQueryClient()
@@ -74,6 +79,11 @@ function App() {
         <Route path="/apikeys" element={<ApiKeys />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/portal" element={<Portal />} />
+        <Route path="/project/:id" element={<ProjectWorkspace />} />
+        <Route path="/dataset/:id" element={<DatasetDetail />} />
+        <Route path="/community" element={<Community />} />
+        <Route path="/notebook" element={<Notebook />} />
       </Route>
     </Routes>
   )

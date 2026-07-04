@@ -26,9 +26,10 @@ import { Badge } from '@/components/ui/Badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs'
 import { getDemoData } from '@/lib/demoData'
 import { getSensorTypeColor, capitalize, formatDate, formatNumber } from '@/lib/utils'
+import type { DatasetComment, PublicDataset } from '@/types'
 
-const demoDatasets = getDemoData().publicDatasets
-const demoComments = getDemoData().comments
+const demoDatasets: PublicDataset[] = getDemoData().publicDatasets as PublicDataset[]
+const demoComments: DatasetComment[] = getDemoData().comments
 
 function MiniSparkline({ data, color }: { data: { timestamp: string; value: number }[]; color: string }) {
   const values = data.map((d) => d.value)
@@ -73,7 +74,7 @@ export default function DatasetDetail() {
   const [forked, setForked] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [commentText, setCommentText] = useState('')
-  const [comments, setComments] = useState(demoComments)
+  const [comments, setComments] = useState<DatasetComment[]>(demoComments)
 
   const dataset = demoDatasets.find((d) => d.id === id) || demoDatasets[0]
   const primaryColor = getSensorTypeColor(dataset.sensor_types[0])
@@ -85,7 +86,7 @@ export default function DatasetDetail() {
 
   const handleAddComment = () => {
     if (!commentText.trim()) return
-    const newComment = {
+    const newComment: DatasetComment = {
       id: `c${Date.now()}`,
       author: 'Demo User',
       author_id: 'demo-id',
