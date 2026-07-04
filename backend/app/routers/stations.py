@@ -11,6 +11,7 @@ from app.dependencies import require_permission, rate_limit_dependency
 from app.models import SensorStation, SensorReading, User
 from app.schemas import StandardResponse, StationCreateRequest, StationUpdateRequest, StationResponse
 from app.constants import STATION_TIER_LIMITS
+from app.services.quality import calculate_quality_score
 
 router = APIRouter(prefix="/stations", tags=["stations"])
 
@@ -189,7 +190,7 @@ async def get_station_quality(
     _authorized: User = Depends(require_permission("read")),
     db: AsyncSession = Depends(get_db),
 ) -> StandardResponse:
-    """Return data quality metrics and overall score for a station."""
+    """Return comprehensive data quality metrics and overall score for a station."""
     result = await db.execute(
         select(SensorStation).where(
             SensorStation.id == station_id,
@@ -203,81 +204,5 @@ async def get_station_quality(
             status_code=status.HTTP_404_NOT_FOUND, detail="Station not found"
         )
 
-    now = datetime.now(timezone.utc)
-    window_start = now - timedelta(days=7)
-
-    # Count total expected vs actual readings in last 7 days
-    total_readings_result = await db.execute(
-        select(func.count(SensorReading.id))
-        .where(SensorReading.station_id == station_id)
-        .where(SensorReading.deleted_at.is_(None))
-        .where(SensorReading.timestamp >= window_start)
-    )
-    total_readings = total_readings_result.scalar_one()
-
-    # Calculate expected readings based on interval
-    minutes_in_window = 7 * 24 * 60
-    expected = minutes_in_window // max(station.expected_reading_interval_minutes, 1)
-    completeness = min((total_readings / max(expected, 1)) * 100.0, 100.0)
-
-    # Uptime: simplistic -- if any reading exists in each day, count as up
-    daily_result = await db.execute(
-        select(func.count(func.distinct(func.date_trunc("day", SensorReading.timestamp))))
-        .where(SensorReading.station_id == station_id)
-        .where(SensorReading.deleted_at.is_(None))
-        .where(SensorReading.timestamp >= window_start)
-    )
-    days_with_data = daily_result.scalar_one()
-    uptime = (days_with_data / 7.0) * 100.0
-
-    # Calibration age
-    calibration_age_days = None
-    if station.last_calibration_at is not None:
-        calibration_age_days = (now - station.last_calibration_at).days
-
-    # Last reading time
-    last_reading_result = await db.execute(
-        select(SensorReading.timestamp)
-        .where(SensorReading.station_id == station_id)
-        .where(SensorReading.deleted_at.is_(None))
-        .order_by(SensorReading.timestamp.desc())
-        .limit(1)
-    )
-    last_reading_row = last_reading_result.one_or_none()
-    last_reading_at = last_reading_row[0] if last_reading_row is not None else None
-
-    # Actual interval (median difference between consecutive readings)
-    actual_interval = None
-    if total_readings > 1:
-        interval_result = await db.execute(
-            select(SensorReading.timestamp)
-            .where(SensorReading.station_id == station_id)
-            .where(SensorReading.deleted_at.is_(None))
-            .where(SensorReading.timestamp >= window_start)
-            .order_by(SensorReading.timestamp.asc())
-        )
-        timestamps = [r[0] for r in interval_result.all()]
-        if len(timestamps) > 1:
-            diffs = [(timestamps[i] - timestamps[i - 1]).total_seconds() / 60.0
-                     for i in range(1, len(timestamps))]
-            diffs.sort()
-            actual_interval = diffs[len(diffs) // 2]
-
-    # Overall score (0-100)
-    score = min(100.0, (uptime * 0.4) + (completeness * 0.4))
-    if calibration_age_days is not None:
-        cal_penalty = min(calibration_age_days / 30.0 * 5.0, 20.0)
-        score = max(0.0, score - cal_penalty)
-
-    return StandardResponse(data={
-        "station_id": str(station_id),
-        "overall_score": round(score, 2),
-        "metrics": {
-            "uptime_percentage": round(uptime, 2),
-            "completeness_percentage": round(completeness, 2),
-            "calibration_age_days": calibration_age_days,
-            "last_reading_at": last_reading_at.isoformat() if last_reading_at else None,
-            "expected_interval_minutes": station.expected_reading_interval_minutes,
-            "actual_interval_minutes": round(actual_interval, 2) if actual_interval else None,
-        },
-    })
+    quality_data = await calculate_quality_score(db, str(station_id), window_days=7)
+    return StandardResponse(data=quality_data)
