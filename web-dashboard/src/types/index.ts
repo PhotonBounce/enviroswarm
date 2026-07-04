@@ -153,3 +153,103 @@ export interface WebhookConfig {
   active: boolean
   created_at: string
 }
+
+export type DatasetLicense = 'CC0' | 'CC-BY-4.0' | 'CC-BY-SA-4.0' | 'ODbL-1.0' | 'MIT'
+export type DataQuality = 'excellent' | 'good' | 'fair' | 'poor'
+export type DatasetVisibility = 'public' | 'private' | 'organization'
+
+export interface PublicDataset {
+  id: string
+  title: string
+  description: string
+  creator: string
+  creator_id: string
+  organization: string
+  organization_slug: string
+  license: DatasetLicense
+  visibility: DatasetVisibility
+  sensor_types: SensorType[]
+  region: string
+  data_quality: DataQuality
+  station_count: number
+  reading_count: number
+  stars: number
+  forks: number
+  downloads: number
+  citations: number
+  created_at: string
+  updated_at: string
+  tags: string[]
+  preview_data: { timestamp: string; value: number; sensor_type: SensorType }[]
+}
+
+export interface Project {
+  id: string
+  name: string
+  description: string
+  visibility: DatasetVisibility
+  owner: string
+  owner_id: string
+  members: ProjectMember[]
+  shared_station_ids: string[]
+  created_at: string
+  updated_at: string
+  starred: boolean
+}
+
+export interface ProjectMember {
+  id: string
+  name: string
+  email: string
+  role: 'owner' | 'admin' | 'editor' | 'viewer'
+  avatar?: string
+  joined_at: string
+}
+
+export interface ActivityItem {
+  id: string
+  type: 'commit' | 'dataset_added' | 'member_joined' | 'note_created' | 'fork' | 'star' | 'comment'
+  actor: string
+  actor_id: string
+  message: string
+  target?: string
+  target_id?: string
+  created_at: string
+}
+
+export interface CommunityFeedItem {
+  id: string
+  type: 'dataset' | 'project' | 'organization'
+  actor: string
+  actor_id: string
+  actor_org: string
+  title: string
+  description: string
+  stars: number
+  comments: number
+  tags: string[]
+  created_at: string
+}
+
+export interface NotebookEntry {
+  id: string
+  title: string
+  content: string
+  tags: string[]
+  author: string
+  author_id: string
+  project_id?: string
+  charts: { title: string; dataset_id: string; sensor_type: SensorType }[]
+  created_at: string
+  updated_at: string
+  shared_with: string[]
+}
+
+export interface Comment {
+  id: string
+  author: string
+  author_id: string
+  content: string
+  created_at: string
+  likes: number
+}
