@@ -49,20 +49,55 @@ export const demoStations: SensorStation[] = [
   },
 ]
 
-export const demoReadings: SensorReading[] = [
-  { id: 'r1', station_id: '1', sensor_type: 'temperature', value: 22.5, unit: '°C', timestamp: '2026-07-01T00:00:00Z' },
-  { id: 'r2', station_id: '1', sensor_type: 'humidity', value: 65, unit: '%', timestamp: '2026-07-01T00:00:00Z' },
-  { id: 'r3', station_id: '1', sensor_type: 'co2', value: 420, unit: 'ppm', timestamp: '2026-07-01T00:00:00Z' },
-  { id: 'r4', station_id: '1', sensor_type: 'pm25', value: 12.3, unit: 'µg/m³', timestamp: '2026-07-01T00:00:00Z' },
-  { id: 'r5', station_id: '1', sensor_type: 'temperature', value: 23.1, unit: '°C', timestamp: '2026-07-01T01:00:00Z' },
-  { id: 'r6', station_id: '1', sensor_type: 'humidity', value: 62, unit: '%', timestamp: '2026-07-01T01:00:00Z' },
-  { id: 'r7', station_id: '1', sensor_type: 'co2', value: 415, unit: 'ppm', timestamp: '2026-07-01T01:00:00Z' },
-  { id: 'r8', station_id: '1', sensor_type: 'pm25', value: 11.8, unit: 'µg/m³', timestamp: '2026-07-01T01:00:00Z' },
-  { id: 'r9', station_id: '1', sensor_type: 'temperature', value: 21.8, unit: '°C', timestamp: '2026-07-01T02:00:00Z' },
-  { id: 'r10', station_id: '1', sensor_type: 'humidity', value: 68, unit: '%', timestamp: '2026-07-01T02:00:00Z' },
-  { id: 'r11', station_id: '1', sensor_type: 'co2', value: 430, unit: 'ppm', timestamp: '2026-07-01T02:00:00Z' },
-  { id: 'r12', station_id: '1', sensor_type: 'pm25', value: 13.1, unit: 'µg/m³', timestamp: '2026-07-01T02:00:00Z' },
-]
+export const demoReadings: SensorReading[] = (() => {
+  const readings: SensorReading[] = []
+  let idCounter = 1
+  const baseDate = new Date('2026-07-01T00:00:00Z')
+
+  // Generate readings for 10 days across 3 stations
+  for (let day = 0; day < 10; day++) {
+    const dayDate = new Date(baseDate)
+    dayDate.setDate(dayDate.getDate() + day)
+
+    // Station 1: temperature, humidity, co2, pm25, pm10 (hourly for 8 hours)
+    for (let hour = 0; hour < 8; hour++) {
+      const ts = new Date(dayDate)
+      ts.setHours(hour)
+      readings.push(
+        { id: `r${idCounter++}`, station_id: '1', sensor_type: 'temperature', value: 20 + Math.random() * 10, unit: '°C', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '1', sensor_type: 'humidity', value: 50 + Math.random() * 30, unit: '%', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '1', sensor_type: 'co2', value: 400 + Math.random() * 100, unit: 'ppm', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '1', sensor_type: 'pm25', value: 5 + Math.random() * 20, unit: 'µg/m³', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '1', sensor_type: 'pm10', value: 10 + Math.random() * 30, unit: 'µg/m³', timestamp: ts.toISOString() },
+      )
+    }
+
+    // Station 2: temperature, noise_level, voc, water_quality (every 3 hours)
+    for (let hour = 0; hour < 24; hour += 3) {
+      const ts = new Date(dayDate)
+      ts.setHours(hour)
+      readings.push(
+        { id: `r${idCounter++}`, station_id: '2', sensor_type: 'temperature', value: 18 + Math.random() * 8, unit: '°C', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '2', sensor_type: 'noise_level', value: 40 + Math.random() * 40, unit: 'dB', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '2', sensor_type: 'voc', value: 100 + Math.random() * 200, unit: 'ppb', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '2', sensor_type: 'water_quality', value: 70 + Math.random() * 30, unit: 'WQI', timestamp: ts.toISOString() },
+      )
+    }
+
+    // Station 3: noise_level, voc, radiation (every 6 hours, fewer data points)
+    for (let hour = 0; hour < 24; hour += 6) {
+      const ts = new Date(dayDate)
+      ts.setHours(hour)
+      readings.push(
+        { id: `r${idCounter++}`, station_id: '3', sensor_type: 'noise_level', value: 50 + Math.random() * 35, unit: 'dB', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '3', sensor_type: 'voc', value: 80 + Math.random() * 150, unit: 'ppb', timestamp: ts.toISOString() },
+        { id: `r${idCounter++}`, station_id: '3', sensor_type: 'radiation', value: 0.05 + Math.random() * 0.15, unit: 'µSv/h', timestamp: ts.toISOString() },
+      )
+    }
+  }
+
+  return readings
+})()
 
 export const demoApiKeys: ApiKey[] = [
   {

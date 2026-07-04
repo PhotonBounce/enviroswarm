@@ -1,37 +1,83 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Menu, Bell, User, X, Smartphone } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Menu, Bell, User, X, Smartphone, FileText } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import SearchBar from '@/components/SearchBar'
+import NotificationPanel from '@/components/NotificationPanel'
+import type { NotificationItem } from '@/components/NotificationPanel'
+import { getDemoData } from '@/lib/demoData'
 
 const mobileNavItems = [
   { path: '/', label: 'Dashboard' },
   { path: '/stations', label: 'Stations' },
   { path: '/data', label: 'Data' },
+  { path: '/reports', label: 'Reports' },
   { path: '/apikeys', label: 'API Keys' },
   { path: '/pricing', label: 'Pricing' },
   { path: '/profile', label: 'Profile' },
 ]
 
+const demoNotifications: NotificationItem[] = [
+  {
+    id: 'n1',
+    title: 'High CO2 detected',
+    message: 'Central Park Air Monitor reported CO2 levels above 1000 ppm. Consider ventilation check.',
+    type: 'alert',
+    read: false,
+    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    link: '/stations',
+  },
+  {
+    id: 'n2',
+    title: 'Station offline',
+    message: 'Downtown Noise Logger has been in maintenance mode for 2 hours.',
+    type: 'warning',
+    read: false,
+    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+  },
+  {
+    id: 'n3',
+    title: 'Daily report ready',
+    message: 'Your daily sensor summary report is ready for download.',
+    type: 'info',
+    read: true,
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+  },
+  {
+    id: 'n4',
+    title: 'Data export complete',
+    message: 'CSV export for Riverside Water Station has been generated successfully.',
+    type: 'success',
+    read: true,
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+]
+
 export default function Header() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<NotificationItem[]>(demoNotifications)
   const location = useLocation()
-  const notificationRef = useRef<HTMLDivElement>(null)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    if (!notificationsOpen) return
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setNotificationsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [notificationsOpen])
+  const handleMarkRead = (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
+  }
+
+  const handleMarkUnread = (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)))
+  }
+
+  const handleDismiss = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id))
+  }
+
+  const handleClearAll = () => {
+    setNotifications([])
+  }
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -84,11 +130,17 @@ export default function Header() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground hidden sm:inline">
             Welcome back, {user?.email?.split('@')[0] ?? 'User'}
           </span>
         </div>
+
         <div className="flex items-center gap-3">
+          <SearchBar
+            onNavigate={(path) => navigate(path)}
+            readings={getDemoData().readings}
+          />
+
           <a
             href="/apk/enviroswarm.apk"
             download
@@ -99,34 +151,15 @@ export default function Header() {
             <Smartphone className="h-3.5 w-3.5" />
             <span>Get APK</span>
           </a>
-          <div className="relative" ref={notificationRef}>
-            <button
-              className="relative rounded-lg p-2 hover:bg-muted"
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
-              aria-label="Notifications"
-              aria-haspopup="true"
-              aria-expanded={notificationsOpen}
-            >
-              <Bell className="h-5 w-5 text-muted-foreground" />
-            </button>
-            {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-72 rounded-lg border border-border bg-card shadow-lg z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <span className="text-sm font-semibold">Notifications</span>
-                  <button
-                    onClick={() => setNotificationsOpen(false)}
-                    className="rounded p-1 hover:bg-muted"
-                    aria-label="Close notifications"
-                  >
-                    <X className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
-                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  No new notifications
-                </div>
-              </div>
-            )}
-          </div>
+
+          <NotificationPanel
+            notifications={notifications}
+            onMarkRead={handleMarkRead}
+            onMarkUnread={handleMarkUnread}
+            onDismiss={handleDismiss}
+            onClearAll={handleClearAll}
+          />
+
           <Link
             to="/profile"
             aria-label="Profile"
@@ -136,6 +169,7 @@ export default function Header() {
           </Link>
         </div>
       </div>
+
       {mobileOpen && (
         <div className="md:hidden border-t border-border bg-card" ref={mobileMenuRef}>
           <nav className="flex flex-col p-2 space-y-1">

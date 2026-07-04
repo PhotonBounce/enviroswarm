@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
@@ -10,6 +11,7 @@ import Register from '@/pages/Register'
 import Dashboard from '@/pages/Dashboard'
 import Stations from '@/pages/Stations'
 import DataExplorer from '@/pages/DataExplorer'
+import Reports from '@/pages/Reports'
 import ApiKeys from '@/pages/ApiKeys'
 import Pricing from '@/pages/Pricing'
 import Profile from '@/pages/Profile'
@@ -68,6 +70,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/stations" element={<Stations />} />
         <Route path="/data" element={<DataExplorer />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/apikeys" element={<ApiKeys />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/profile" element={<Profile />} />
