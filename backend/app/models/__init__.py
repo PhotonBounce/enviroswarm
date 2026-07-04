@@ -54,6 +54,15 @@ class User(Base):
     subscriptions: Mapped[List["Subscription"]] = relationship(
         "Subscription", back_populates="owner"
     )
+    reports: Mapped[List["Report"]] = relationship(
+        "Report", back_populates="owner", cascade="all, delete-orphan"
+    )
+    share_tokens: Mapped[List["ShareToken"]] = relationship(
+        "ShareToken", back_populates="owner", cascade="all, delete-orphan"
+    )
+    alerts: Mapped[List["Alert"]] = relationship(
+        "Alert", back_populates="owner", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         CheckConstraint("tier IN ('free', 'pro', 'enterprise')", name="ck_user_tier"),
@@ -75,6 +84,13 @@ class SensorStation(Base):
     longitude: Mapped[Optional[float]] = mapped_column(Numeric(11, 8, asdecimal=False), nullable=True)
     sensor_types: Mapped[List[str]] = mapped_column(JSON, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    # Data quality tracking
+    last_calibration_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expected_reading_interval_minutes: Mapped[int] = mapped_column(
+        default=15, nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -129,7 +145,7 @@ class SensorReading(Base):
     )
 
     __table_args__ = (
-        CheckConstraint(f"sensor_type IN ({', '.join(repr(t) for t in ['air_quality', 'temperature', 'humidity', 'noise_level', 'radiation', 'water_quality', 'co2', 'pm25', 'pm10', 'voc'])})", name="ck_reading_sensor_type"),
+        CheckConstraint(f"sensor_type IN ({', '.join(repr(t) for t in ['air_quality', 'temperature', 'humidity', 'noise_level', 'radiation', 'water_quality', 'co2', 'pm25', 'pm10', 'voc'])}", name="ck_reading_sensor_type"),
         Index("ix_sensor_readings_station_id", "station_id"),
         Index("ix_sensor_readings_sensor_type", "sensor_type"),
         Index("ix_sensor_readings_timestamp", "timestamp"),
@@ -264,4 +280,122 @@ class IdempotencyKey(Base):
         CheckConstraint("expires_at >= created_at", name="ck_idempotency_expires_after_created"),
         UniqueConstraint("user_id", "key_hash", name="uq_idempotency_user_key"),
         Index("ix_idempotency_keys_expires_at", "expires_at"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# New models for expanded features
+# ---------------------------------------------------------------------------
+
+class Report(Base):
+    """Generated report metadata."""
+    __tablename__ = "reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    station_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sensor_stations.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    report_format: Mapped[str] = mapped_column(String(10), nullable=False)
+    file_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    date_range_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    date_range_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    owner: Mapped[User] = relationship("User", back_populates="reports")
+
+    __table_args__ = (
+        CheckConstraint("report_format IN ('pdf', 'csv', 'excel')", name="ck_report_format"),
+        CheckConstraint("status IN ('pending', 'processing', 'completed', 'failed')", name="ck_report_status"),
+        Index("ix_reports_user_id", "user_id"),
+        Index("ix_reports_status", "status"),
+    )
+
+
+class ShareToken(Base):
+    """Public read-only dashboard share tokens."""
+    __tablename__ = "share_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    station_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sensor_stations.id", ondelete="CASCADE"), nullable=True
+    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    owner: Mapped[User] = relationship("User", back_populates="share_tokens")
+
+    __table_args__ = (
+        Index("ix_share_tokens_token", "token"),
+        Index("ix_share_tokens_user_id", "user_id"),
+    )
+
+
+class Alert(Base):
+    """User-configurable alerts for sensor conditions."""
+    __tablename__ = "alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    station_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sensor_stations.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    sensor_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    condition: Mapped[str] = mapped_column(String(20), nullable=False)
+    threshold: Mapped[float] = mapped_column(Numeric(15, 6, asdecimal=False), nullable=False)
+    notify_methods: Mapped[List[str]] = mapped_column(JSON, default=list)
+    cooldown_minutes: Mapped[int] = mapped_column(default=60, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    last_triggered_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    owner: Mapped[User] = relationship("User", back_populates="alerts")
+
+    __table_args__ = (
+        CheckConstraint(f"sensor_type IN ({', '.join(repr(t) for t in ['air_quality', 'temperature', 'humidity', 'noise_level', 'radiation', 'water_quality', 'co2', 'pm25', 'pm10', 'voc'])})", name="ck_alert_sensor_type"),
+        CheckConstraint("condition IN ('gt', 'lt', 'eq', 'gte', 'lte')", name="ck_alert_condition"),
+        CheckConstraint("cooldown_minutes >= 0", name="ck_alert_cooldown"),
+        Index("ix_alerts_user_id", "user_id"),
+        Index("ix_alerts_station_id", "station_id"),
+        Index("ix_alerts_active", "is_active"),
     )
