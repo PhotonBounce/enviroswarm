@@ -1,1 +1,0 @@
-{"action":"evaluate","args":{"code":"new Promise(resolve => { setTimeout(() => { resolve({ consoleErrors: (window.__errors || []).slice(0, 10), uncaughtErrors: (window.__uncaught || []).slice(0, 10), reactExists: typeof window.React !== 'undefined', hasErrorBoundary: !!document.querySelector('[data-error-boundary]') }); }, 3000); })"},"session":"enviroswarm-qa-cycle27"}

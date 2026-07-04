@@ -591,14 +591,3 @@ class AggregationResponse(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     count: int
-
-    id: UUID
-    user_id: UUID
-    tier: str
-    start_date: datetime
-    end_date: datetime
-    payment_status: str
-    payment_intent_id: Optional[str] = None
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)

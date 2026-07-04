@@ -24,8 +24,8 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    old_values: Mapped[Optional[dict]] = mapped_column("old_data", Text, nullable=True)
-    new_values: Mapped[Optional[dict]] = mapped_column("new_data", Text, nullable=True)
+    old_values: Mapped[Optional[str]] = mapped_column("old_data", Text, nullable=True)
+    new_values: Mapped[Optional[str]] = mapped_column("new_data", Text, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
