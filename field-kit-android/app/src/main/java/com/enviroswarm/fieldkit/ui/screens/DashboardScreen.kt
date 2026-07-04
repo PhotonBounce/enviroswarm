@@ -188,18 +188,21 @@ private fun AQIGauge(
         label = "aqi_progress"
     )
 
+    val gaugeSize = size
+    val gaugeStrokeWidth = strokeWidth
+
     Box(
-        modifier = modifier.size(size),
+        modifier = modifier.size(gaugeSize),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val arcSize = size.toPx() - strokeWidth.toPx()
-            val arcStroke = strokeWidth.toPx()
+            val arcSizePx = gaugeSize.toPx() - gaugeStrokeWidth.toPx()
+            val arcStrokePx = gaugeStrokeWidth.toPx()
             val topLeft = Offset(
-                (size.toPx() - arcSize) / 2,
-                (size.toPx() - arcSize) / 2
+                (gaugeSize.toPx() - arcSizePx) / 2,
+                (gaugeSize.toPx() - arcSizePx) / 2
             )
-            val arcRect = Size(arcSize, arcSize)
+            val arcRect = Size(arcSizePx, arcSizePx)
 
             // Background track
             drawArc(
@@ -209,7 +212,7 @@ private fun AQIGauge(
                 useCenter = false,
                 topLeft = topLeft,
                 size = arcRect,
-                style = Stroke(width = arcStroke, cap = StrokeCap.Round)
+                style = Stroke(width = arcStrokePx, cap = StrokeCap.Round)
             )
 
             // Progress arc
@@ -221,7 +224,7 @@ private fun AQIGauge(
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcRect,
-                    style = Stroke(width = arcStroke, cap = StrokeCap.Round)
+                    style = Stroke(width = arcStrokePx, cap = StrokeCap.Round)
                 )
             }
         }

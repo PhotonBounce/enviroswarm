@@ -73,7 +73,7 @@ class SyncService : LifecycleService() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ENViroSwarm Field Kit")
             .setContentText("Syncing data…")
-            .setSmallIcon(android.R.drawable.ic_menu_upload)
+            .setSmallIcon(android.R.drawable.ic_menu_info_details)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()

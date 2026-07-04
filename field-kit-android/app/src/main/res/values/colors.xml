@@ -1,0 +1,13 @@
+<resources>
+    <color name="teal_500">#FF14B8A6</color>
+    <color name="teal_600">#FF0D9488</color>
+    <color name="teal_800">#FF115E59</color>
+    <color name="sky_500">#FF0EA5E9</color>
+    <color name="sky_600">#FF0284C7</color>
+    <color name="aqi_good">#FF22C55E</color>
+    <color name="aqi_moderate">#FFEAB308</color>
+    <color name="aqi_unhealthy_sensitive">#FFF97316</color>
+    <color name="aqi_unhealthy">#FFEF4444</color>
+    <color name="aqi_very_unhealthy">#FFA855F7</color>
+    <color name="aqi_hazardous">#FF7F1D1D</color>
+</resources>
