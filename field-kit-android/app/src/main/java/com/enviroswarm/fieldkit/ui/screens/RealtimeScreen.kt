@@ -106,9 +106,9 @@ fun RealtimeScreen() {
             delay(1000)
             t += 1.0
             val point = TimeSeriesPoint(
-                pm25 = 15.0 + 10.0 * kotlin.math.sin(t * 0.2) + kotlin.math.random() * 5,
-                co2 = 400 + (50 * kotlin.math.sin(t * 0.1)).toInt() + (kotlin.math.random() * 20).toInt(),
-                temperature = 22.0 + 3.0 * kotlin.math.sin(t * 0.15) + kotlin.math.random() * 0.5
+                pm25 = 15.0 + 10.0 * kotlin.math.sin(t * 0.2) + kotlin.random.Random.nextDouble() * 5,
+                co2 = 400 + (50 * kotlin.math.sin(t * 0.1)).toInt() + (kotlin.random.Random.nextDouble() * 20).toInt(),
+                temperature = 22.0 + 3.0 * kotlin.math.sin(t * 0.15) + kotlin.random.Random.nextDouble() * 0.5
             )
             dataPoints = dataPoints + point
         }
