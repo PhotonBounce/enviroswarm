@@ -65,6 +65,18 @@ export default function Pricing() {
         </div>
       )}
 
+      {/* Free Trial Banner */}
+      <div className="rounded-xl bg-gradient-to-r from-teal-500 to-sky-500 p-6 text-white text-center shadow-lg">
+        <Zap className="h-8 w-8 mx-auto mb-2" />
+        <h2 className="text-xl font-bold">Start with 7 Days Free</h2>
+        <p className="text-sm opacity-90 mt-1">
+          All new accounts get full Enterprise access for 7 days. No credit card required.
+        </p>
+        <p className="text-xs opacity-80 mt-2">
+          After 7 days, you can stay on Free or upgrade to Pro/Enterprise.
+        </p>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-3">
         {tiers.map((t: typeof tiers[0]) => {
           const isCurrent = tier === t.tier
@@ -74,7 +86,7 @@ export default function Pricing() {
               key={t.tier}
               className={cn(
                 'relative flex flex-col',
-                t.tier === 'pro' && 'border-emerald-600/50 shadow-emerald-900/20'
+                t.tier === 'pro' && 'border-teal-500/50 shadow-teal-900/20'
               )}
             >
               {t.tier === 'pro' && (
@@ -97,7 +109,7 @@ export default function Pricing() {
                 <ul className="space-y-3">
                   {t.features.map((feature: string, index: number) => (
                     <li key={`${t.tier}-${feature}-${index}`} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 text-emerald-400 shrink-0" />
+                      <Check className="mt-0.5 h-4 w-4 text-teal-400 shrink-0" />
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}

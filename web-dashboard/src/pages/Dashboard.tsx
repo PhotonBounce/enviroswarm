@@ -17,7 +17,10 @@ import ExposureTracker from '@/components/pollution/ExposureTracker'
 import type { SensorStation } from '@/types'
 import { cn } from '@/lib/utils'
 
+import { useAuth } from '@/hooks/useAuth'
+
 export default function Dashboard() {
+  const { trial, isTrialActive, tier } = useAuth()
   const { data: stations, isLoading, error } = useStations()
 
   const [refreshKey, setRefreshKey] = useState(0)
@@ -100,6 +103,29 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground">Pollution monitoring overview and health insights</p>
       </div>
+
+      {/* Trial Banner */}
+      {isTrialActive && (
+        <div className="rounded-xl bg-gradient-to-r from-teal-500 to-sky-500 p-4 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Zap className="h-5 w-5" />
+              <div>
+                <p className="font-semibold">Free Trial Active — All Features Unlocked!</p>
+                <p className="text-sm opacity-90">
+                  {trial?.daysRemaining} day{trial?.daysRemaining !== 1 ? 's' : ''} remaining. 
+                  Upgrade anytime to keep enterprise access.
+                </p>
+              </div>
+            </div>
+            <Link to="/pricing">
+              <Button variant="secondary" size="sm" className="bg-white text-teal-600 hover:bg-white/90">
+                Upgrade
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
