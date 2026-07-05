@@ -1,4 +1,4 @@
-import { Check, Zap } from 'lucide-react'
+import { Check, Zap, Bitcoin } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -6,6 +6,7 @@ import { usePricing, useSubscribe } from '@/hooks/useApi'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import CryptoPaymentModal from '@/components/CryptoPaymentModal'
 
 export default function Pricing() {
   const { data: pricingTiers } = usePricing()
@@ -13,6 +14,8 @@ export default function Pricing() {
   const { tier } = useAuth()
   const [pendingTier, setPendingTier] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [cryptoModalOpen, setCryptoModalOpen] = useState(false)
+  const [cryptoTier, setCryptoTier] = useState({ tier: '', name: '' })
 
   const tiers = pricingTiers ?? [
     {
@@ -52,6 +55,11 @@ export default function Pricing() {
     }
   }
 
+  const openCryptoPayment = (tierId: string, tierName: string) => {
+    setCryptoTier({ tier: tierId, name: tierName })
+    setCryptoModalOpen(true)
+  }
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -77,10 +85,22 @@ export default function Pricing() {
         </p>
       </div>
 
+      {/* Crypto Payment Banner */}
+      <div className="rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-white text-center shadow-lg">
+        <div className="flex items-center justify-center gap-2 mb-1">
+          <Bitcoin className="h-5 w-5" />
+          <span className="font-bold">Now Accepting Crypto</span>
+        </div>
+        <p className="text-sm opacity-90">
+          Pay with ETH, BTC, SOL, TRX, BNB, MATIC, and more across 10+ chains.
+        </p>
+      </div>
+
       <div className="grid gap-6 md:grid-cols-3">
         {tiers.map((t: typeof tiers[0]) => {
           const isCurrent = tier === t.tier
           const isPending = pendingTier === t.tier
+          const showCrypto = t.tier !== 'free'
           return (
             <Card
               key={t.tier}
@@ -114,7 +134,7 @@ export default function Pricing() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-6">
+                <div className="mt-6 space-y-2">
                   <Button
                     className="w-full"
                     variant={isCurrent ? 'outline' : t.tier === 'pro' ? 'default' : 'outline'}
@@ -123,12 +143,59 @@ export default function Pricing() {
                   >
                     {isCurrent ? 'Current Plan' : isPending ? 'Processing...' : 'Subscribe'}
                   </Button>
+                  {showCrypto && (
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => openCryptoPayment(t.tier, t.name)}
+                    >
+                      <Bitcoin className="mr-2 h-4 w-4" />
+                      Pay with Crypto
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           )
         })}
       </div>
+
+      {/* Supported Chains */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-center mb-4">Supported Blockchains</h3>
+          <div className="flex flex-wrap justify-center gap-3">
+            {[
+              { name: 'Ethereum', color: '#627EEA', abbr: 'ETH' },
+              { name: 'Bitcoin', color: '#F7931A', abbr: 'BTC' },
+              { name: 'Solana', color: '#9945FF', abbr: 'SOL' },
+              { name: 'Tron', color: '#FF060A', abbr: 'TRX' },
+              { name: 'BNB', color: '#F3BA2F', abbr: 'BNB' },
+              { name: 'Polygon', color: '#8247E5', abbr: 'MATIC' },
+              { name: 'Linea', color: '#121212', abbr: 'Linea' },
+              { name: 'Base', color: '#0052FF', abbr: 'Base' },
+              { name: 'Arbitrum', color: '#28A0F0', abbr: 'ARB' },
+              { name: 'Optimism', color: '#FF0420', abbr: 'OP' },
+            ].map((chain) => (
+              <div
+                key={chain.name}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium"
+                style={{
+                  backgroundColor: `${chain.color}15`,
+                  color: chain.color,
+                  border: `1px solid ${chain.color}30`,
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: chain.color }}
+                />
+                {chain.name}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-6">
@@ -148,6 +215,14 @@ export default function Pricing() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Crypto Payment Modal */}
+      <CryptoPaymentModal
+        isOpen={cryptoModalOpen}
+        onClose={() => setCryptoModalOpen(false)}
+        tier={cryptoTier.tier}
+        tierName={cryptoTier.name}
+      />
     </div>
   )
 }
