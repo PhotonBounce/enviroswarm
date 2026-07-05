@@ -24,6 +24,7 @@ const mobileNavItems = [
   { path: '/apikeys', label: 'API Keys' },
   { path: '/pricing', label: 'Pricing' },
   { path: '/profile', label: 'Profile' },
+  { path: '/get-app', label: 'Download App' },
 ]
 
 const demoNotifications: NotificationItem[] = [
@@ -209,9 +210,8 @@ export default function Header() {
           />
 
           <a
-            href="/apk/enviroswarm.apk"
-            download
-            className="hidden sm:flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 transition-colors"
+            href="/enviroswarm/get-app"
+            className="hidden sm:flex items-center gap-1.5 rounded-lg bg-teal-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-600 transition-colors"
             aria-label="Download Android APK"
             title="Download Android App"
           >

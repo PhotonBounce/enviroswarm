@@ -23,6 +23,7 @@ import Portal from '@/pages/Portal'
 import ProjectWorkspace from '@/pages/ProjectWorkspace'
 import DatasetDetail from '@/pages/DatasetDetail'
 import Community from '@/pages/Community'
+import DownloadPage from '@/pages/Download'
 import Notebook from '@/components/Notebook'
 
 function App() {
@@ -75,6 +76,7 @@ function App() {
     <Routes>
       <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
       <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} />
+      <Route path="/get-app" element={<DownloadPage />} />
       <Route element={isAuthenticated ? <Layout /> : <Navigate to="/login" replace />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/landing" element={<LandingPage />} />
